@@ -19,11 +19,17 @@ Download [Adventure Works 2014 OLTP Script](https://github.com/Microsoft/sql-ser
 Extract the .zip and copy all of the CSV files into the same folder, also containing update_csvs.rb file and install.sql.
 
 Modify the CSVs to work with Postgres by running:
+```sh
+elixir update_csvs.exs
 ```
+
+or
+
+```sh
 ruby update_csvs.rb
 ```
 Create the database and tables, import the data, and set up the views and keys with:
-```
+```sh
 psql -c "CREATE DATABASE \"Adventureworks\";"
 psql -d Adventureworks < install.sql
 ```
