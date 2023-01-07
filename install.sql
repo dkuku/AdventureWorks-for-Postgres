@@ -29,7 +29,7 @@
 --   Instead of:
 --       SELECT p.firstname, e.jobtitle
 --       FROM person.person AS p
---         INNER JOIN humanresources.employee AS e ON p.businessentityid = e.businessentityid;
+--         INNER JOIN humanresources.employee AS e ON p.business_entity_id = e.business_entity_id;
 --
 -- Schemas for these views:
 --   pe = person
@@ -50,625 +50,625 @@
 \pset tuples_only on
 
 -- Support to auto-generate UUIDs (aka GUIDs)
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+create extension if not exists "uuid-ossp";
 
 -- Support crosstab function to do PIVOT thing for Sales.vSalesPersonSalesByFiscalYears
-CREATE EXTENSION tablefunc;
+create extension tablefunc;
 
 -------------------------------------
 -- Custom data types
 -------------------------------------
 
-CREATE DOMAIN "OrderNumber" varchar(25) NULL;
-CREATE DOMAIN "AccountNumber" varchar(15) NULL;
+create domain "order_number" varchar(25) null;
+create domain "account_number" varchar(15) null;
 
-CREATE DOMAIN "Flag" boolean NOT NULL;
-CREATE DOMAIN "NameStyle" boolean NOT NULL;
-CREATE DOMAIN "Name" varchar(50) NULL;
-CREATE DOMAIN "Phone" varchar(25) NULL;
+create domain "flag" boolean not null;
+create domain "name_style" boolean not null;
+create domain "name" varchar(50) null;
+create domain "phone" varchar(25) null;
 
 
 -------------------------------------
 -- Five schemas, with tables and data
 -------------------------------------
 
-CREATE SCHEMA Person
-  CREATE TABLE BusinessEntity(
-    BusinessEntityID SERIAL, --  NOT FOR REPLICATION
-    rowguid uuid NOT NULL CONSTRAINT "DF_BusinessEntity_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_BusinessEntity_ModifiedDate" DEFAULT (NOW())
+create schema person
+  create table business_entity(
+    business_entity_id serial, --  not for replication
+    rowguid uuid not null constraint "df_business_entity_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_business_entity_modified_date" default (now())
   )
-  CREATE TABLE Person(
-    BusinessEntityID INT NOT NULL,
-    PersonType char(2) NOT NULL,
-    NameStyle "NameStyle" NOT NULL CONSTRAINT "DF_Person_NameStyle" DEFAULT (false),
-    Title varchar(8) NULL,
-    FirstName "Name" NOT NULL,
-    MiddleName "Name" NULL,
-    LastName "Name" NOT NULL,
-    Suffix varchar(10) NULL,
-    EmailPromotion INT NOT NULL CONSTRAINT "DF_Person_EmailPromotion" DEFAULT (0),
-    AdditionalContactInfo XML NULL, -- XML("AdditionalContactInfoSchemaCollection"),
-    Demographics XML NULL, -- XML("IndividualSurveySchemaCollection"),
-    rowguid uuid NOT NULL CONSTRAINT "DF_Person_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_Person_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_Person_EmailPromotion" CHECK (EmailPromotion BETWEEN 0 AND 2),
-    CONSTRAINT "CK_Person_PersonType" CHECK (PersonType IS NULL OR UPPER(PersonType) IN ('SC', 'VC', 'IN', 'EM', 'SP', 'GC'))
+  create table person(
+    business_entity_id int not null,
+    person_type char(2) not null,
+    name_style "name_style" not null constraint "df_person_name_style" default (false),
+    title varchar(8) null,
+    first_name "name" not null,
+    middle_name "name" null,
+    last_name "name" not null,
+    suffix varchar(10) null,
+    email_promotion int not null constraint "df_person_email_promotion" default (0),
+    additional_contact_info xml null, -- xml("additional_contact_info_schema_collection"),
+    demographics xml null, -- xml("individual_survey_schema_collection"),
+    rowguid uuid not null constraint "df_person_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_person_modified_date" default (now()),
+    constraint "ck_person_email_promotion" check (email_promotion between 0 and 2),
+    constraint "ck_person_person_type" check (person_type is null or upper(person_type) in ('SC', 'VC', 'IN', 'EM', 'SP', 'GC'))
   )
-  CREATE TABLE StateProvince(
-    StateProvinceID SERIAL,
-    StateProvinceCode char(3) NOT NULL,
-    CountryRegionCode varchar(3) NOT NULL,
-    IsOnlyStateProvinceFlag "Flag" NOT NULL CONSTRAINT "DF_StateProvince_IsOnlyStateProvinceFlag" DEFAULT (true),
-    Name "Name" NOT NULL,
-    TerritoryID INT NOT NULL,
-    rowguid uuid NOT NULL CONSTRAINT "DF_StateProvince_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_StateProvince_ModifiedDate" DEFAULT (NOW())
+  create table state_province(
+    state_province_id serial,
+    state_province_code char(3) not null,
+    country_region_code varchar(3) not null,
+    is_only_state_province_flag "flag" not null constraint "df_state_province_is_only_state_province_flag" default (true),
+    name "name" not null,
+    territory_id int not null,
+    rowguid uuid not null constraint "df_state_province_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_state_province_modified_date" default (now())
   )
-  CREATE TABLE Address(
-    AddressID SERIAL, --  NOT FOR REPLICATION
-    AddressLine1 varchar(60) NOT NULL,
-    AddressLine2 varchar(60) NULL,
-    City varchar(30) NOT NULL,
-    StateProvinceID INT NOT NULL,
-    PostalCode varchar(15) NOT NULL,
-    SpatialLocation varchar(44) NULL,
-    rowguid uuid NOT NULL CONSTRAINT "DF_Address_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_Address_ModifiedDate" DEFAULT (NOW())
+  create table address(
+    address_id serial, --  not for replication
+    address_line1 varchar(60) not null,
+    address_line2 varchar(60) null,
+    city varchar(30) not null,
+    state_province_id int not null,
+    postal_code varchar(15) not null,
+    spatial_location varchar(44) null,
+    rowguid uuid not null constraint "df_address_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_address_modified_date" default (now())
   )
-  CREATE TABLE AddressType(
-    AddressTypeID SERIAL,
-    Name "Name" NOT NULL,
-    rowguid uuid NOT NULL CONSTRAINT "DF_AddressType_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_AddressType_ModifiedDate" DEFAULT (NOW())
+  create table address_type(
+    address_type_id serial,
+    name "name" not null,
+    rowguid uuid not null constraint "df_address_type_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_address_type_modified_date" default (now())
   )
-  CREATE TABLE BusinessEntityAddress(
-    BusinessEntityID INT NOT NULL,
-    AddressID INT NOT NULL,
-    AddressTypeID INT NOT NULL,
-    rowguid uuid NOT NULL CONSTRAINT "DF_BusinessEntityAddress_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_BusinessEntityAddress_ModifiedDate" DEFAULT (NOW())
+  create table business_entity_address(
+    business_entity_id int not null,
+    address_id int not null,
+    address_type_id int not null,
+    rowguid uuid not null constraint "df_business_entity_address_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_business_entity_address_modified_date" default (now())
   )
-  CREATE TABLE ContactType(
-    ContactTypeID SERIAL,
-    Name "Name" NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ContactType_ModifiedDate" DEFAULT (NOW())
+  create table contact_type(
+    contact_type_id serial,
+    name "name" not null,
+    modified_date timestamp not null constraint "df_contact_type_modified_date" default (now())
   )
-  CREATE TABLE BusinessEntityContact(
-    BusinessEntityID INT NOT NULL,
-    PersonID INT NOT NULL,
-    ContactTypeID INT NOT NULL,
-    rowguid uuid NOT NULL CONSTRAINT "DF_BusinessEntityContact_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_BusinessEntityContact_ModifiedDate" DEFAULT (NOW())
+  create table business_entity_contact(
+    business_entity_id int not null,
+    person_id int not null,
+    contact_type_id int not null,
+    rowguid uuid not null constraint "df_business_entity_contact_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_business_entity_contact_modified_date" default (now())
   )
-  CREATE TABLE EmailAddress(
-    BusinessEntityID INT NOT NULL,
-    EmailAddressID SERIAL,
-    EmailAddress varchar(50) NULL,
-    rowguid uuid NOT NULL CONSTRAINT "DF_EmailAddress_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_EmailAddress_ModifiedDate" DEFAULT (NOW())
+  create table email_address(
+    business_entity_id int not null,
+    email_address_id serial,
+    email_address varchar(50) null,
+    rowguid uuid not null constraint "df_email_address_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_email_address_modified_date" default (now())
   )
-  CREATE TABLE Password(
-    BusinessEntityID INT NOT NULL,
-    PasswordHash VARCHAR(128) NOT NULL,
-    PasswordSalt VARCHAR(10) NOT NULL,
-    rowguid uuid NOT NULL CONSTRAINT "DF_Password_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_Password_ModifiedDate" DEFAULT (NOW())
+  create table password(
+    business_entity_id int not null,
+    password_hash varchar(128) not null,
+    password_salt varchar(10) not null,
+    rowguid uuid not null constraint "df_password_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_password_modified_date" default (now())
   )
-  CREATE TABLE PhoneNumberType(
-    PhoneNumberTypeID SERIAL,
-    Name "Name" NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_PhoneNumberType_ModifiedDate" DEFAULT (NOW())
+  create table phone_number_type(
+    phone_number_type_id serial,
+    name "name" not null,
+    modified_date timestamp not null constraint "df_phone_number_type_modified_date" default (now())
   )
-  CREATE TABLE PersonPhone(
-    BusinessEntityID INT NOT NULL,
-    PhoneNumber "Phone" NOT NULL,
-    PhoneNumberTypeID INT NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_PersonPhone_ModifiedDate" DEFAULT (NOW())
+  create table person_phone(
+    business_entity_id int not null,
+    phone_number "phone" not null,
+    phone_number_type_id int not null,
+    modified_date timestamp not null constraint "df_person_phone_modified_date" default (now())
   )
-  CREATE TABLE CountryRegion(
-    CountryRegionCode varchar(3) NOT NULL,
-    Name "Name" NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_CountryRegion_ModifiedDate" DEFAULT (NOW())
+  create table country_region(
+    country_region_code varchar(3) not null,
+    name "name" not null,
+    modified_date timestamp not null constraint "df_country_region_modified_date" default (now())
   );
 
-COMMENT ON SCHEMA Person IS 'Contains objects related to names and addresses of customers, vendors, and employees';
+comment on schema person is 'contains objects related to names and addresses of customers, vendors, and employees';
 
-SELECT 'Copying data into Person.BusinessEntity';
-\copy Person.BusinessEntity FROM './BusinessEntity.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Person.Person';
-\copy Person.Person FROM './Person.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Person.StateProvince';
-\copy Person.StateProvince FROM './StateProvince.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Person.Address';
-\copy Person.Address FROM './Address.csv' DELIMITER E'\t' CSV ENCODING 'latin1';
-SELECT 'Copying data into Person.AddressType';
-\copy Person.AddressType FROM './AddressType.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Person.BusinessEntityAddress';
-\copy Person.BusinessEntityAddress FROM './BusinessEntityAddress.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Person.ContactType';
-\copy Person.ContactType FROM './ContactType.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Person.BusinessEntityContact';
-\copy Person.BusinessEntityContact FROM './BusinessEntityContact.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Person.EmailAddress';
-\copy Person.EmailAddress FROM './EmailAddress.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Person.Password';
-\copy Person.Password FROM './Password.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Person.PhoneNumberType';
-\copy Person.PhoneNumberType FROM './PhoneNumberType.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Person.PersonPhone';
-\copy Person.PersonPhone FROM './PersonPhone.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Person.CountryRegion';
-\copy Person.CountryRegion FROM './CountryRegion.csv' DELIMITER E'\t' CSV;
+select 'copying data into person.business_entity';
+\copy person.business_entity from './BusinessEntity.csv' delimiter e'\t' csv;
+select 'copying data into person.person';
+\copy person.person from './Person.csv' delimiter e'\t' csv;
+select 'copying data into person.state_province';
+\copy person.state_province from './StateProvince.csv' delimiter e'\t' csv;
+select 'copying data into person.address';
+\copy person.address from './Address.csv' delimiter e'\t' csv encoding 'latin1';
+select 'copying data into person.address_type';
+\copy person.address_type from './AddressType.csv' delimiter e'\t' csv;
+select 'copying data into person.business_entity_address';
+\copy person.business_entity_address from './BusinessEntityAddress.csv' delimiter e'\t' csv;
+select 'copying data into person.contact_type';
+\copy person.contact_type from './ContactType.csv' delimiter e'\t' csv;
+select 'copying data into person.business_entity_contact';
+\copy person.business_entity_contact from './BusinessEntityContact.csv' delimiter e'\t' csv;
+select 'copying data into person.email_address';
+\copy person.email_address from './EmailAddress.csv' delimiter e'\t' csv;
+select 'copying data into person.password';
+\copy person.password from './Password.csv' delimiter e'\t' csv;
+select 'copying data into person.phone_number_type';
+\copy person.phone_number_type from './PhoneNumberType.csv' delimiter e'\t' csv;
+select 'copying data into person.person_phone';
+\copy person.person_phone from './PersonPhone.csv' delimiter e'\t' csv;
+select 'copying data into person.country_region';
+\copy person.country_region from './CountryRegion.csv' delimiter e'\t' csv;
 
 
-CREATE SCHEMA HumanResources
-  CREATE TABLE Department(
-    DepartmentID SERIAL NOT NULL, -- smallint
-    Name "Name" NOT NULL,
-    GroupName "Name" NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_Department_ModifiedDate" DEFAULT (NOW())
+create schema human_resources
+  create table department(
+    department_id serial not null, -- smallint
+    name "name" not null,
+    group_name "name" not null,
+    modified_date timestamp not null constraint "df_department_modified_date" default (now())
   )
-  CREATE TABLE Employee(
-    BusinessEntityID INT NOT NULL,
-    NationalIDNumber varchar(15) NOT NULL,
-    LoginID varchar(256) NOT NULL,    
-    Org varchar NULL,-- hierarchyid, will become OrganizationNode
-    OrganizationLevel INT NULL, -- AS OrganizationNode.GetLevel(),
-    JobTitle varchar(50) NOT NULL,
-    BirthDate DATE NOT NULL,
-    MaritalStatus char(1) NOT NULL,
-    Gender char(1) NOT NULL,
-    HireDate DATE NOT NULL,
-    SalariedFlag "Flag" NOT NULL CONSTRAINT "DF_Employee_SalariedFlag" DEFAULT (true),
-    VacationHours smallint NOT NULL CONSTRAINT "DF_Employee_VacationHours" DEFAULT (0),
-    SickLeaveHours smallint NOT NULL CONSTRAINT "DF_Employee_SickLeaveHours" DEFAULT (0),
-    CurrentFlag "Flag" NOT NULL CONSTRAINT "DF_Employee_CurrentFlag" DEFAULT (true),
-    rowguid uuid NOT NULL CONSTRAINT "DF_Employee_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_Employee_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_Employee_BirthDate" CHECK (BirthDate BETWEEN '1930-01-01' AND NOW() - INTERVAL '18 years'),
-    CONSTRAINT "CK_Employee_MaritalStatus" CHECK (UPPER(MaritalStatus) IN ('M', 'S')), -- Married or Single
-    CONSTRAINT "CK_Employee_HireDate" CHECK (HireDate BETWEEN '1996-07-01' AND NOW() + INTERVAL '1 day'),
-    CONSTRAINT "CK_Employee_Gender" CHECK (UPPER(Gender) IN ('M', 'F')), -- Male or Female
-    CONSTRAINT "CK_Employee_VacationHours" CHECK (VacationHours BETWEEN -40 AND 240),
-    CONSTRAINT "CK_Employee_SickLeaveHours" CHECK (SickLeaveHours BETWEEN 0 AND 120)
+  create table employee(
+    business_entity_id int not null,
+    national_id_number varchar(15) not null,
+    login_id varchar(256) not null,    
+    org varchar null,-- hierarchyid, will become organization_node
+    organization_level int null, -- as organization_node.get_level(),
+    job_title varchar(50) not null,
+    birth_date date not null,
+    marital_status char(1) not null,
+    gender char(1) not null,
+    hire_date date not null,
+    salaried_flag "flag" not null constraint "df_employee_salaried_flag" default (true),
+    vacation_hours smallint not null constraint "df_employee_vacation_hours" default (0),
+    sick_leave_hours smallint not null constraint "df_employee_sick_leave_hours" default (0),
+    current_flag "flag" not null constraint "df_employee_current_flag" default (true),
+    rowguid uuid not null constraint "df_employee_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_employee_modified_date" default (now()),
+    constraint "ck_employee_birth_date" check (birth_date between '1930-01-01' and now() - interval '18 years'),
+    constraint "ck_employee_marital_status" check (upper(marital_status) in ('M', 'S')), -- married or single
+    constraint "ck_employee_hire_date" check (hire_date between '1996-07-01' and now() + interval '1 day'),
+    constraint "ck_employee_gender" check (upper(gender) in ('M', 'F')), -- male or female
+    constraint "ck_employee_vacation_hours" check (vacation_hours between -40 and 240),
+    constraint "ck_employee_sick_leave_hours" check (sick_leave_hours between 0 and 120)
   )
-  CREATE TABLE EmployeeDepartmentHistory(
-    BusinessEntityID INT NOT NULL,
-    DepartmentID smallint NOT NULL,
-    ShiftID smallint NOT NULL, -- tinyint
-    StartDate DATE NOT NULL,
-    EndDate DATE NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_EmployeeDepartmentHistory_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_EmployeeDepartmentHistory_EndDate" CHECK ((EndDate >= StartDate) OR (EndDate IS NULL))
+  create table employee_department_history(
+    business_entity_id int not null,
+    department_id smallint not null,
+    shift_id smallint not null, -- tinyint
+    start_date date not null,
+    end_date date null,
+    modified_date timestamp not null constraint "df_employee_department_history_modified_date" default (now()),
+    constraint "ck_employee_department_history_end_date" check ((end_date >= start_date) or (end_date is null))
   )
-  CREATE TABLE EmployeePayHistory(
-    BusinessEntityID INT NOT NULL,
-    RateChangeDate TIMESTAMP NOT NULL,
-    Rate numeric NOT NULL, -- money
-    PayFrequency smallint NOT NULL,  -- tinyint
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_EmployeePayHistory_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_EmployeePayHistory_PayFrequency" CHECK (PayFrequency IN (1, 2)), -- 1 = monthly salary, 2 = biweekly salary
-    CONSTRAINT "CK_EmployeePayHistory_Rate" CHECK (Rate BETWEEN 6.50 AND 200.00)
+  create table employee_pay_history(
+    business_entity_id int not null,
+    rate_change_date timestamp not null,
+    rate numeric not null, -- money
+    pay_frequency smallint not null,  -- tinyint
+    modified_date timestamp not null constraint "df_employee_pay_history_modified_date" default (now()),
+    constraint "ck_employee_pay_history_pay_frequency" check (pay_frequency in (1, 2)), -- 1 = monthly salary, 2 = biweekly salary
+    constraint "ck_employee_pay_history_rate" check (rate between 6.50 and 200.00)
   )
-  CREATE TABLE JobCandidate(
-    JobCandidateID SERIAL NOT NULL, -- int
-    BusinessEntityID INT NULL,
-    Resume XML NULL, -- XML(HRResumeSchemaCollection)
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_JobCandidate_ModifiedDate" DEFAULT (NOW())
+  create table job_candidate(
+    job_candidate_id serial not null, -- int
+    business_entity_id int null,
+    resume xml null, -- xml(hr_resume_schema_collection)
+    modified_date timestamp not null constraint "df_job_candidate_modified_date" default (now())
   )
-  CREATE TABLE Shift(
-    ShiftID SERIAL NOT NULL, -- tinyint
-    Name "Name" NOT NULL,
-    StartTime time NOT NULL,
-    EndTime time NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_Shift_ModifiedDate" DEFAULT (NOW())
+  create table shift(
+    shift_id serial not null, -- tinyint
+    name "name" not null,
+    start_time time not null,
+    end_time time not null,
+    modified_date timestamp not null constraint "df_shift_modified_date" default (now())
   );
 
-COMMENT ON SCHEMA HumanResources IS 'Contains objects related to employees and departments.';
+comment on schema human_resources is 'contains objects related to employees and departments.';
 
-SELECT 'Copying data into HumanResources.Department';
-\copy HumanResources.Department FROM './Department.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into HumanResources.Employee';
-\copy HumanResources.Employee FROM './Employee.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into HumanResources.EmployeeDepartmentHistory';
-\copy HumanResources.EmployeeDepartmentHistory FROM './EmployeeDepartmentHistory.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into HumanResources.EmployeePayHistory';
-\copy HumanResources.EmployeePayHistory FROM './EmployeePayHistory.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into HumanResources.JobCandidate';
-\copy HumanResources.JobCandidate FROM './JobCandidate.csv' DELIMITER E'\t' CSV ENCODING 'latin1';
-SELECT 'Copying data into HumanResources.Shift';
-\copy HumanResources.Shift FROM './Shift.csv' DELIMITER E'\t' CSV;
+select 'copying data into human_resources.department';
+\copy human_resources.department from './Department.csv' delimiter e'\t' csv;
+select 'copying data into human_resources.employee';
+\copy human_resources.employee from './Employee.csv' delimiter e'\t' csv;
+select 'copying data into human_resources.employee_department_history';
+\copy human_resources.employee_department_history from './EmployeeDepartmentHistory.csv' delimiter e'\t' csv;
+select 'copying data into human_resources.employee_pay_history';
+\copy human_resources.employee_pay_history from './EmployeePayHistory.csv' delimiter e'\t' csv;
+select 'copying data into human_resources.job_candidate';
+\copy human_resources.job_candidate from './JobCandidate.csv' delimiter e'\t' csv encoding 'latin1';
+select 'copying data into human_resources.shift';
+\copy human_resources.shift from './Shift.csv' delimiter e'\t' csv;
 
 -- Calculated column that needed to be there just for the CSV import
-ALTER TABLE HumanResources.Employee DROP COLUMN OrganizationLevel;
+alter table human_resources.employee drop column organization_level;
 
 -- Employee HierarchyID column
-ALTER TABLE HumanResources.Employee ADD organizationnode VARCHAR DEFAULT '/';
+alter table human_resources.employee add organization_node varchar default '/';
 -- Convert from all the hex to a stream of hierarchyid bits
-WITH RECURSIVE hier AS (
-  SELECT businessentityid, org, get_byte(decode(substring(org, 1, 2), 'hex'), 0)::bit(8)::varchar AS bits, 2 AS i
-    FROM HumanResources.Employee
-  UNION ALL
-  SELECT e.businessentityid, e.org, hier.bits || get_byte(decode(substring(e.org, i + 1, 2), 'hex'), 0)::bit(8)::varchar, i + 2 AS i
-    FROM HumanResources.Employee AS e INNER JOIN
-      hier ON e.businessentityid = hier.businessentityid AND i < LENGTH(e.org)
+with recursive hier as (
+  select business_entity_id, org, get_byte(decode(substring(org, 1, 2), 'hex'), 0)::bit(8)::varchar as bits, 2 as i
+    from human_resources.employee
+  union all
+  select e.business_entity_id, e.org, hier.bits || get_byte(decode(substring(e.org, i + 1, 2), 'hex'), 0)::bit(8)::varchar, i + 2 as i
+    from human_resources.employee as e inner join
+      hier on e.business_entity_id = hier.business_entity_id and i < length(e.org)
 )
-UPDATE HumanResources.Employee AS emp
-  SET org = COALESCE(trim(trailing '0' FROM hier.bits::TEXT), '')
-  FROM hier
-  WHERE emp.businessentityid = hier.businessentityid
-    AND (hier.org IS NULL OR i = LENGTH(hier.org));
+update human_resources.employee as emp
+  set org = coalesce(trim(trailing '0' from hier.bits::text), '')
+  from hier
+  where emp.business_entity_id = hier.business_entity_id
+    and (hier.org is null or i = length(hier.org));
 
 -- Convert bits to the real hieararchy paths
-CREATE OR REPLACE FUNCTION f_ConvertOrgNodes()
-  RETURNS void AS
+create or replace function f_convert_org_nodes()
+  returns void as
 $func$
-DECLARE
-  got_none BOOLEAN;
-BEGIN
-  LOOP
+declare
+  got_none boolean;
+begin
+  loop
   got_none := true;
   -- 01 = 0-3
-  UPDATE HumanResources.Employee
-   SET organizationnode = organizationnode || SUBSTRING(org, 3,2)::bit(2)::INTEGER::VARCHAR || CASE SUBSTRING(org, 5, 1) WHEN '0' THEN '.' ELSE '/' END,
-     org = SUBSTRING(org, 6, 9999)
-    WHERE org LIKE '01%';
-  IF FOUND THEN
+  update human_resources.employee
+   set organization_node = organization_node || substring(org, 3,2)::bit(2)::integer::varchar || case substring(org, 5, 1) when '0' then '.' else '/' end,
+     org = substring(org, 6, 9999)
+    where org like '01%';
+  if found then
     got_none := false;
-  END IF;
+  end if;
 
   -- 100 = 4-7
-  UPDATE HumanResources.Employee
-   SET organizationnode = organizationnode || (SUBSTRING(org, 4,2)::bit(2)::INTEGER + 4)::VARCHAR || CASE SUBSTRING(org, 6, 1) WHEN '0' THEN '.' ELSE '/' END,
-     org = SUBSTRING(org, 7, 9999)
-    WHERE org LIKE '100%';
-  IF FOUND THEN
+  update human_resources.employee
+   set organization_node = organization_node || (substring(org, 4,2)::bit(2)::integer + 4)::varchar || case substring(org, 6, 1) when '0' then '.' else '/' end,
+     org = substring(org, 7, 9999)
+    where org like '100%';
+  if found then
     got_none := false;
-  END IF;
+  end if;
   
   -- 101 = 8-15
-  UPDATE HumanResources.Employee
-   SET organizationnode = organizationnode || (SUBSTRING(org, 4,3)::bit(3)::INTEGER + 8)::VARCHAR || CASE SUBSTRING(org, 7, 1) WHEN '0' THEN '.' ELSE '/' END,
-     org = SUBSTRING(org, 8, 9999)
-    WHERE org LIKE '101%';
-  IF FOUND THEN
+  update human_resources.employee
+   set organization_node = organization_node || (substring(org, 4,3)::bit(3)::integer + 8)::varchar || case substring(org, 7, 1) when '0' then '.' else '/' end,
+     org = substring(org, 8, 9999)
+    where org like '101%';
+  if found then
     got_none := false;
-  END IF;
+  end if;
 
   -- 110 = 16-79
-  UPDATE HumanResources.Employee
-   SET organizationnode = organizationnode || ((SUBSTRING(org, 4,2)||SUBSTRING(org, 7,1)||SUBSTRING(org, 9,3))::bit(6)::INTEGER + 16)::VARCHAR || CASE SUBSTRING(org, 12, 1) WHEN '0' THEN '.' ELSE '/' END,
-     org = SUBSTRING(org, 13, 9999)
-    WHERE org LIKE '110%';
-  IF FOUND THEN
+  update human_resources.employee
+   set organization_node = organization_node || ((substring(org, 4,2)||substring(org, 7,1)||substring(org, 9,3))::bit(6)::integer + 16)::varchar || case substring(org, 12, 1) when '0' then '.' else '/' end,
+     org = substring(org, 13, 9999)
+    where org like '110%';
+  if found then
     got_none := false;
-  END IF;
+  end if;
 
   -- 1110 = 80-1103
-  UPDATE HumanResources.Employee
-   SET organizationnode = organizationnode || ((SUBSTRING(org, 5,3)||SUBSTRING(org, 9,3)||SUBSTRING(org, 13,1)||SUBSTRING(org, 15,3))::bit(10)::INTEGER + 80)::VARCHAR || CASE SUBSTRING(org, 18, 1) WHEN '0' THEN '.' ELSE '/' END,
-     org = SUBSTRING(org, 19, 9999)
-    WHERE org LIKE '1110%';
-  IF FOUND THEN
+  update human_resources.employee
+   set organization_node = organization_node || ((substring(org, 5,3)||substring(org, 9,3)||substring(org, 13,1)||substring(org, 15,3))::bit(10)::integer + 80)::varchar || case substring(org, 18, 1) when '0' then '.' else '/' end,
+     org = substring(org, 19, 9999)
+    where org like '1110%';
+  if found then
     got_none := false;
-  END IF;
-  EXIT WHEN got_none;
-  END LOOP;
-END
-$func$ LANGUAGE plpgsql;
+  end if;
+  exit when got_none;
+  end loop;
+end
+$func$ language plpgsql;
 
-SELECT f_ConvertOrgNodes();
+select f_convert_org_nodes();
 -- Drop the original binary hierarchyid column
-ALTER TABLE HumanResources.Employee DROP COLUMN Org;
-DROP FUNCTION f_ConvertOrgNodes();
+alter table human_resources.employee drop column org;
+drop function f_convert_org_nodes();
 
 
 
 
-CREATE SCHEMA Production
-  CREATE TABLE BillOfMaterials(
-    BillOfMaterialsID SERIAL NOT NULL, -- int
-    ProductAssemblyID INT NULL,
-    ComponentID INT NOT NULL,
-    StartDate TIMESTAMP NOT NULL CONSTRAINT "DF_BillOfMaterials_StartDate" DEFAULT (NOW()),
-    EndDate TIMESTAMP NULL,
-    UnitMeasureCode char(3) NOT NULL,
-    BOMLevel smallint NOT NULL,
-    PerAssemblyQty decimal(8, 2) NOT NULL CONSTRAINT "DF_BillOfMaterials_PerAssemblyQty" DEFAULT (1.00),
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_BillOfMaterials_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_BillOfMaterials_EndDate" CHECK ((EndDate > StartDate) OR (EndDate IS NULL)),
-    CONSTRAINT "CK_BillOfMaterials_ProductAssemblyID" CHECK (ProductAssemblyID <> ComponentID),
-    CONSTRAINT "CK_BillOfMaterials_BOMLevel" CHECK (((ProductAssemblyID IS NULL)
-        AND (BOMLevel = 0) AND (PerAssemblyQty = 1.00))
-        OR ((ProductAssemblyID IS NOT NULL) AND (BOMLevel >= 1))),
-    CONSTRAINT "CK_BillOfMaterials_PerAssemblyQty" CHECK (PerAssemblyQty >= 1.00)
+create schema production
+  create table bill_of_materials(
+    bill_of_materials_id serial not null, -- int
+    product_assembly_id int null,
+    component_id int not null,
+    start_date timestamp not null constraint "df_bill_of_materials_start_date" default (now()),
+    end_date timestamp null,
+    unit_measure_code char(3) not null,
+    bom_level smallint not null,
+    per_assembly_qty decimal(8, 2) not null constraint "df_bill_of_materials_per_assembly_qty" default (1.00),
+    modified_date timestamp not null constraint "df_bill_of_materials_modified_date" default (now()),
+    constraint "ck_bill_of_materials_end_date" check ((end_date > start_date) or (end_date is null)),
+    constraint "ck_bill_of_materials_product_assembly_id" check (product_assembly_id <> component_id),
+    constraint "ck_bill_of_materials_bom_level" check (((product_assembly_id is null)
+        and (bom_level = 0) and (per_assembly_qty = 1.00))
+        or ((product_assembly_id is not null) and (bom_level >= 1))),
+    constraint "ck_bill_of_materials_per_assembly_qty" check (per_assembly_qty >= 1.00)
   )
-  CREATE TABLE Culture(
-    CultureID char(6) NOT NULL,
-    Name "Name" NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_Culture_ModifiedDate" DEFAULT (NOW())
+  create table culture(
+    culture_id char(6) not null,
+    name "name" not null,
+    modified_date timestamp not null constraint "df_culture_modified_date" default (now())
   )
-  CREATE TABLE Document(
-    Doc varchar NULL,-- hierarchyid, will become DocumentNode
-    DocumentLevel INTEGER, -- AS DocumentNode.GetLevel(),
-    Title varchar(50) NOT NULL,
-    Owner INT NOT NULL,
-    FolderFlag "Flag" NOT NULL CONSTRAINT "DF_Document_FolderFlag" DEFAULT (false),
-    FileName varchar(400) NOT NULL,
-    FileExtension varchar(8) NULL,
-    Revision char(5) NOT NULL,
-    ChangeNumber INT NOT NULL CONSTRAINT "DF_Document_ChangeNumber" DEFAULT (0),
-    Status smallint NOT NULL, -- tinyint
-    DocumentSummary text NULL,
-    Document bytea  NULL, -- varbinary
-    rowguid uuid NOT NULL UNIQUE CONSTRAINT "DF_Document_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_Document_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_Document_Status" CHECK (Status BETWEEN 1 AND 3)
+  create table document(
+    doc varchar null,-- hierarchyid, will become document_node
+    document_level integer, -- as document_node.get_level(),
+    title varchar(50) not null,
+    owner int not null,
+    folder_flag "flag" not null constraint "df_document_folder_flag" default (false),
+    file_name varchar(400) not null,
+    file_extension varchar(8) null,
+    revision char(5) not null,
+    change_number int not null constraint "df_document_change_number" default (0),
+    status smallint not null, -- tinyint
+    document_summary text null,
+    document bytea  null, -- varbinary
+    rowguid uuid not null unique constraint "df_document_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_document_modified_date" default (now()),
+    constraint "ck_document_status" check (status between 1 and 3)
   )
-  CREATE TABLE ProductCategory(
-    ProductCategoryID SERIAL NOT NULL, -- int
-    Name "Name" NOT NULL,
-    rowguid uuid NOT NULL CONSTRAINT "DF_ProductCategory_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ProductCategory_ModifiedDate" DEFAULT (NOW())
+  create table product_category(
+    product_category_id serial not null, -- int
+    name "name" not null,
+    rowguid uuid not null constraint "df_product_category_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_product_category_modified_date" default (now())
   )
-  CREATE TABLE ProductSubcategory(
-    ProductSubcategoryID SERIAL NOT NULL, -- int
-    ProductCategoryID INT NOT NULL,
-    Name "Name" NOT NULL,
-    rowguid uuid NOT NULL CONSTRAINT "DF_ProductSubcategory_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ProductSubcategory_ModifiedDate" DEFAULT (NOW())
+  create table product_subcategory(
+    product_subcategory_id serial not null, -- int
+    product_category_id int not null,
+    name "name" not null,
+    rowguid uuid not null constraint "df_product_subcategory_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_product_subcategory_modified_date" default (now())
   )
-  CREATE TABLE ProductModel(
-    ProductModelID SERIAL NOT NULL, -- int
-    Name "Name" NOT NULL,
-    CatalogDescription XML NULL, -- XML(Production.ProductDescriptionSchemaCollection)
-    Instructions XML NULL, -- XML(Production.ManuInstructionsSchemaCollection)
-    rowguid uuid NOT NULL CONSTRAINT "DF_ProductModel_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ProductModel_ModifiedDate" DEFAULT (NOW())
+  create table product_model(
+    product_model_id serial not null, -- int
+    name "name" not null,
+    catalog_description xml null, -- xml(production.product_description_schema_collection)
+    instructions xml null, -- xml(production.manu_instructions_schema_collection)
+    rowguid uuid not null constraint "df_product_model_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_product_model_modified_date" default (now())
   )
-  CREATE TABLE Product(
-    ProductID SERIAL NOT NULL, -- int
-    Name "Name" NOT NULL,
-    ProductNumber varchar(25) NOT NULL,
-    MakeFlag "Flag" NOT NULL CONSTRAINT "DF_Product_MakeFlag" DEFAULT (true),
-    FinishedGoodsFlag "Flag" NOT NULL CONSTRAINT "DF_Product_FinishedGoodsFlag" DEFAULT (true),
-    Color varchar(15) NULL,
-    SafetyStockLevel smallint NOT NULL,
-    ReorderPoint smallint NOT NULL,
-    StandardCost numeric NOT NULL, -- money
-    ListPrice numeric NOT NULL, -- money
-    Size varchar(5) NULL,
-    SizeUnitMeasureCode char(3) NULL,
-    WeightUnitMeasureCode char(3) NULL,
-    Weight decimal(8, 2) NULL,
-    DaysToManufacture INT NOT NULL,
-    ProductLine char(2) NULL,
-    Class char(2) NULL,
-    Style char(2) NULL,
-    ProductSubcategoryID INT NULL,
-    ProductModelID INT NULL,
-    SellStartDate TIMESTAMP NOT NULL,
-    SellEndDate TIMESTAMP NULL,
-    DiscontinuedDate TIMESTAMP NULL,
-    rowguid uuid NOT NULL CONSTRAINT "DF_Product_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_Product_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_Product_SafetyStockLevel" CHECK (SafetyStockLevel > 0),
-    CONSTRAINT "CK_Product_ReorderPoint" CHECK (ReorderPoint > 0),
-    CONSTRAINT "CK_Product_StandardCost" CHECK (StandardCost >= 0.00),
-    CONSTRAINT "CK_Product_ListPrice" CHECK (ListPrice >= 0.00),
-    CONSTRAINT "CK_Product_Weight" CHECK (Weight > 0.00),
-    CONSTRAINT "CK_Product_DaysToManufacture" CHECK (DaysToManufacture >= 0),
-    CONSTRAINT "CK_Product_ProductLine" CHECK (UPPER(ProductLine) IN ('S', 'T', 'M', 'R') OR ProductLine IS NULL),
-    CONSTRAINT "CK_Product_Class" CHECK (UPPER(Class) IN ('L', 'M', 'H') OR Class IS NULL),
-    CONSTRAINT "CK_Product_Style" CHECK (UPPER(Style) IN ('W', 'M', 'U') OR Style IS NULL),
-    CONSTRAINT "CK_Product_SellEndDate" CHECK ((SellEndDate >= SellStartDate) OR (SellEndDate IS NULL))
+  create table product(
+    product_id serial not null, -- int
+    name "name" not null,
+    product_number varchar(25) not null,
+    make_flag "flag" not null constraint "df_product_make_flag" default (true),
+    finished_goods_flag "flag" not null constraint "df_product_finished_goods_flag" default (true),
+    color varchar(15) null,
+    safety_stock_level smallint not null,
+    reorder_point smallint not null,
+    standard_cost numeric not null, -- money
+    list_price numeric not null, -- money
+    size varchar(5) null,
+    size_unit_measure_code char(3) null,
+    weight_unit_measure_code char(3) null,
+    weight decimal(8, 2) null,
+    days_to_manufacture int not null,
+    product_line char(2) null,
+    class char(2) null,
+    style char(2) null,
+    product_subcategory_id int null,
+    product_model_id int null,
+    sell_start_date timestamp not null,
+    sell_end_date timestamp null,
+    discontinued_date timestamp null,
+    rowguid uuid not null constraint "df_product_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_product_modified_date" default (now()),
+    constraint "ck_product_safety_stock_level" check (safety_stock_level > 0),
+    constraint "ck_product_reorder_point" check (reorder_point > 0),
+    constraint "ck_product_standard_cost" check (standard_cost >= 0.00),
+    constraint "ck_product_list_price" check (list_price >= 0.00),
+    constraint "ck_product_weight" check (weight > 0.00),
+    constraint "ck_product_days_to_manufacture" check (days_to_manufacture >= 0),
+    constraint "ck_product_product_line" check (upper(product_line) in ('S', 'T', 'M', 'R') or product_line is null),
+    constraint "ck_product_class" check (upper(class) in ('L', 'M', 'H') or class is null),
+    constraint "ck_product_style" check (upper(style) in ('W', 'M', 'U') or style is null),
+    constraint "ck_product_sell_end_date" check ((sell_end_date >= sell_start_date) or (sell_end_date is null))
   )
-  CREATE TABLE ProductCostHistory(
-    ProductID INT NOT NULL,
-    StartDate TIMESTAMP NOT NULL,
-    EndDate TIMESTAMP NULL,
-    StandardCost numeric NOT NULL,  -- money
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ProductCostHistory_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_ProductCostHistory_EndDate" CHECK ((EndDate >= StartDate) OR (EndDate IS NULL)),
-    CONSTRAINT "CK_ProductCostHistory_StandardCost" CHECK (StandardCost >= 0.00)
+  create table product_cost_history(
+    product_id int not null,
+    start_date timestamp not null,
+    end_date timestamp null,
+    standard_cost numeric not null,  -- money
+    modified_date timestamp not null constraint "df_product_cost_history_modified_date" default (now()),
+    constraint "ck_product_cost_history_end_date" check ((end_date >= start_date) or (end_date is null)),
+    constraint "ck_product_cost_history_standard_cost" check (standard_cost >= 0.00)
   )
-  CREATE TABLE ProductDescription(
-    ProductDescriptionID SERIAL NOT NULL, -- int
-    Description varchar(400) NOT NULL,
-    rowguid uuid NOT NULL CONSTRAINT "DF_ProductDescription_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ProductDescription_ModifiedDate" DEFAULT (NOW())
+  create table product_description(
+    product_description_id serial not null, -- int
+    description varchar(400) not null,
+    rowguid uuid not null constraint "df_product_description_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_product_description_modified_date" default (now())
   )
-  CREATE TABLE ProductDocument(
-    ProductID INT NOT NULL,
-    Doc varchar NOT NULL, -- hierarchyid, will become DocumentNode
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ProductDocument_ModifiedDate" DEFAULT (NOW())
+  create table product_document(
+    product_id int not null,
+    doc varchar not null, -- hierarchyid, will become document_node
+    modified_date timestamp not null constraint "df_product_document_modified_date" default (now())
   )
-  CREATE TABLE Location(
-    LocationID SERIAL NOT NULL, -- smallint
-    Name "Name" NOT NULL,
-    CostRate numeric NOT NULL CONSTRAINT "DF_Location_CostRate" DEFAULT (0.00), -- smallmoney -- money
-    Availability decimal(8, 2) NOT NULL CONSTRAINT "DF_Location_Availability" DEFAULT (0.00),
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_Location_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_Location_CostRate" CHECK (CostRate >= 0.00),
-    CONSTRAINT "CK_Location_Availability" CHECK (Availability >= 0.00)
+  create table location(
+    location_id serial not null, -- smallint
+    name "name" not null,
+    cost_rate numeric not null constraint "df_location_cost_rate" default (0.00), -- smallmoney -- money
+    availability decimal(8, 2) not null constraint "df_location_availability" default (0.00),
+    modified_date timestamp not null constraint "df_location_modified_date" default (now()),
+    constraint "ck_location_cost_rate" check (cost_rate >= 0.00),
+    constraint "ck_location_availability" check (availability >= 0.00)
   )
-  CREATE TABLE ProductInventory(
-    ProductID INT NOT NULL,
-    LocationID smallint NOT NULL,
-    Shelf varchar(10) NOT NULL,
-    Bin smallint NOT NULL, -- tinyint
-    Quantity smallint NOT NULL CONSTRAINT "DF_ProductInventory_Quantity" DEFAULT (0),
-    rowguid uuid NOT NULL CONSTRAINT "DF_ProductInventory_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ProductInventory_ModifiedDate" DEFAULT (NOW()),
+  create table product_inventory(
+    product_id int not null,
+    location_id smallint not null,
+    shelf varchar(10) not null,
+    bin smallint not null, -- tinyint
+    quantity smallint not null constraint "df_product_inventory_quantity" default (0),
+    rowguid uuid not null constraint "df_product_inventory_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_product_inventory_modified_date" default (now()),
 --    CONSTRAINT "CK_ProductInventory_Shelf" CHECK ((Shelf LIKE 'AZa-z]') OR (Shelf = 'N/A')),
-    CONSTRAINT "CK_ProductInventory_Bin" CHECK (Bin BETWEEN 0 AND 100)
+    constraint "ck_product_inventory_bin" check (bin between 0 and 100)
   )
-  CREATE TABLE ProductListPriceHistory(
-    ProductID INT NOT NULL,
-    StartDate TIMESTAMP NOT NULL,
-    EndDate TIMESTAMP NULL,
-    ListPrice numeric NOT NULL,  -- money
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ProductListPriceHistory_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_ProductListPriceHistory_EndDate" CHECK ((EndDate >= StartDate) OR (EndDate IS NULL)),
-    CONSTRAINT "CK_ProductListPriceHistory_ListPrice" CHECK (ListPrice > 0.00)
+  create table product_list_price_history(
+    product_id int not null,
+    start_date timestamp not null,
+    end_date timestamp null,
+    list_price numeric not null,  -- money
+    modified_date timestamp not null constraint "df_product_list_price_history_modified_date" default (now()),
+    constraint "ck_product_list_price_history_end_date" check ((end_date >= start_date) or (end_date is null)),
+    constraint "ck_product_list_price_history_list_price" check (list_price > 0.00)
   )
-  CREATE TABLE Illustration(
-    IllustrationID SERIAL NOT NULL, -- int
-    Diagram XML NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_Illustration_ModifiedDate" DEFAULT (NOW())
+  create table illustration(
+    illustration_id serial not null, -- int
+    diagram xml null,
+    modified_date timestamp not null constraint "df_illustration_modified_date" default (now())
   )
-  CREATE TABLE ProductModelIllustration(
-    ProductModelID INT NOT NULL,
-    IllustrationID INT NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ProductModelIllustration_ModifiedDate" DEFAULT (NOW())
+  create table product_model_illustration(
+    product_model_id int not null,
+    illustration_id int not null,
+    modified_date timestamp not null constraint "df_product_model_illustration_modified_date" default (now())
   )
-  CREATE TABLE ProductModelProductDescriptionCulture(
-    ProductModelID INT NOT NULL,
-    ProductDescriptionID INT NOT NULL,
-    CultureID char(6) NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ProductModelProductDescriptionCulture_ModifiedDate" DEFAULT (NOW())
+  create table product_model_product_description_culture(
+    product_model_id int not null,
+    product_description_id int not null,
+    culture_id char(6) not null,
+    modified_date timestamp not null constraint "df_product_model_product_description_culture_modified_date" default (now())
   )
-  CREATE TABLE ProductPhoto(
-    ProductPhotoID SERIAL NOT NULL, -- int
-    ThumbNailPhoto bytea NULL,-- varbinary
-    ThumbnailPhotoFileName varchar(50) NULL,
-    LargePhoto bytea NULL,-- varbinary
-    LargePhotoFileName varchar(50) NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ProductPhoto_ModifiedDate" DEFAULT (NOW())
+  create table product_photo(
+    product_photo_id serial not null, -- int
+    thumb_nail_photo bytea null,-- varbinary
+    thumbnail_photo_file_name varchar(50) null,
+    large_photo bytea null,-- varbinary
+    large_photo_file_name varchar(50) null,
+    modified_date timestamp not null constraint "df_product_photo_modified_date" default (now())
   )
-  CREATE TABLE ProductProductPhoto(
-    ProductID INT NOT NULL,
-    ProductPhotoID INT NOT NULL,
-    "primary" "Flag" NOT NULL CONSTRAINT "DF_ProductProductPhoto_Primary" DEFAULT (false),
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ProductProductPhoto_ModifiedDate" DEFAULT (NOW())
+  create table product_product_photo(
+    product_id int not null,
+    product_photo_id int not null,
+    "primary" "flag" not null constraint "df_product_product_photo_primary" default (false),
+    modified_date timestamp not null constraint "df_product_product_photo_modified_date" default (now())
   )
-  CREATE TABLE ProductReview(
-    ProductReviewID SERIAL NOT NULL, -- int
-    ProductID INT NOT NULL,
-    ReviewerName "Name" NOT NULL,
-    ReviewDate TIMESTAMP NOT NULL CONSTRAINT "DF_ProductReview_ReviewDate" DEFAULT (NOW()),
-    EmailAddress varchar(50) NOT NULL,
-    Rating INT NOT NULL,
-    Comments varchar(3850),
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ProductReview_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_ProductReview_Rating" CHECK (Rating BETWEEN 1 AND 5)
+  create table product_review(
+    product_review_id serial not null, -- int
+    product_id int not null,
+    reviewer_name "name" not null,
+    review_date timestamp not null constraint "df_product_review_review_date" default (now()),
+    email_address varchar(50) not null,
+    rating int not null,
+    comments varchar(3850),
+    modified_date timestamp not null constraint "df_product_review_modified_date" default (now()),
+    constraint "ck_product_review_rating" check (rating between 1 and 5)
   )
-  CREATE TABLE ScrapReason(
-    ScrapReasonID SERIAL NOT NULL, -- smallint
-    Name "Name" NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ScrapReason_ModifiedDate" DEFAULT (NOW())
+  create table scrap_reason(
+    scrap_reason_id serial not null, -- smallint
+    name "name" not null,
+    modified_date timestamp not null constraint "df_scrap_reason_modified_date" default (now())
   )
-  CREATE TABLE TransactionHistory(
-    TransactionID SERIAL NOT NULL, -- INT IDENTITY (100000, 1)
-    ProductID INT NOT NULL,
-    ReferenceOrderID INT NOT NULL,
-    ReferenceOrderLineID INT NOT NULL CONSTRAINT "DF_TransactionHistory_ReferenceOrderLineID" DEFAULT (0),
-    TransactionDate TIMESTAMP NOT NULL CONSTRAINT "DF_TransactionHistory_TransactionDate" DEFAULT (NOW()),
-    TransactionType char(1) NOT NULL,
-    Quantity INT NOT NULL,
-    ActualCost numeric NOT NULL,  -- money
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_TransactionHistory_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_TransactionHistory_TransactionType" CHECK (UPPER(TransactionType) IN ('W', 'S', 'P'))
+  create table transaction_history(
+    transaction_id serial not null, -- int identity (100000, 1)
+    product_id int not null,
+    reference_order_id int not null,
+    reference_order_line_id int not null constraint "df_transaction_history_reference_order_line_id" default (0),
+    transaction_date timestamp not null constraint "df_transaction_history_transaction_date" default (now()),
+    transaction_type char(1) not null,
+    quantity int not null,
+    actual_cost numeric not null,  -- money
+    modified_date timestamp not null constraint "df_transaction_history_modified_date" default (now()),
+    constraint "ck_transaction_history_transaction_type" check (upper(transaction_type) in ('W', 'S', 'P'))
   )
-  CREATE TABLE TransactionHistoryArchive(
-    TransactionID INT NOT NULL,
-    ProductID INT NOT NULL,
-    ReferenceOrderID INT NOT NULL,
-    ReferenceOrderLineID INT NOT NULL CONSTRAINT "DF_TransactionHistoryArchive_ReferenceOrderLineID" DEFAULT (0),
-    TransactionDate TIMESTAMP NOT NULL CONSTRAINT "DF_TransactionHistoryArchive_TransactionDate" DEFAULT (NOW()),
-    TransactionType char(1) NOT NULL,
-    Quantity INT NOT NULL,
-    ActualCost numeric NOT NULL,  -- money
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_TransactionHistoryArchive_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_TransactionHistoryArchive_TransactionType" CHECK (UPPER(TransactionType) IN ('W', 'S', 'P'))
+  create table transaction_history_archive(
+    transaction_id int not null,
+    product_id int not null,
+    reference_order_id int not null,
+    reference_order_line_id int not null constraint "df_transaction_history_archive_reference_order_line_id" default (0),
+    transaction_date timestamp not null constraint "df_transaction_history_archive_transaction_date" default (now()),
+    transaction_type char(1) not null,
+    quantity int not null,
+    actual_cost numeric not null,  -- money
+    modified_date timestamp not null constraint "df_transaction_history_archive_modified_date" default (now()),
+    constraint "ck_transaction_history_archive_transaction_type" check (upper(transaction_type) in ('W', 'S', 'P'))
   )
-  CREATE TABLE UnitMeasure(
-    UnitMeasureCode char(3) NOT NULL,
-    Name "Name" NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_UnitMeasure_ModifiedDate" DEFAULT (NOW())
+  create table unit_measure(
+    unit_measure_code char(3) not null,
+    name "name" not null,
+    modified_date timestamp not null constraint "df_unit_measure_modified_date" default (now())
   )
-  CREATE TABLE WorkOrder(
-    WorkOrderID SERIAL NOT NULL, -- int
-    ProductID INT NOT NULL,
-    OrderQty INT NOT NULL,
-    StockedQty INT, -- AS ISNULL(OrderQty - ScrappedQty, 0),
-    ScrappedQty smallint NOT NULL,
-    StartDate TIMESTAMP NOT NULL,
-    EndDate TIMESTAMP NULL,
-    DueDate TIMESTAMP NOT NULL,
-    ScrapReasonID smallint NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_WorkOrder_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_WorkOrder_OrderQty" CHECK (OrderQty > 0),
-    CONSTRAINT "CK_WorkOrder_ScrappedQty" CHECK (ScrappedQty >= 0),
-    CONSTRAINT "CK_WorkOrder_EndDate" CHECK ((EndDate >= StartDate) OR (EndDate IS NULL))
+  create table work_order(
+    work_order_id serial not null, -- int
+    product_id int not null,
+    order_qty int not null,
+    stocked_qty int, -- as isnull(order_qty - scrapped_qty, 0),
+    scrapped_qty smallint not null,
+    start_date timestamp not null,
+    end_date timestamp null,
+    due_date timestamp not null,
+    scrap_reason_id smallint null,
+    modified_date timestamp not null constraint "df_work_order_modified_date" default (now()),
+    constraint "ck_work_order_order_qty" check (order_qty > 0),
+    constraint "ck_work_order_scrapped_qty" check (scrapped_qty >= 0),
+    constraint "ck_work_order_end_date" check ((end_date >= start_date) or (end_date is null))
   )
-  CREATE TABLE WorkOrderRouting(
-    WorkOrderID INT NOT NULL,
-    ProductID INT NOT NULL,
-    OperationSequence smallint NOT NULL,
-    LocationID smallint NOT NULL,
-    ScheduledStartDate TIMESTAMP NOT NULL,
-    ScheduledEndDate TIMESTAMP NOT NULL,
-    ActualStartDate TIMESTAMP NULL,
-    ActualEndDate TIMESTAMP NULL,
-    ActualResourceHrs decimal(9, 4) NULL,
-    PlannedCost numeric NOT NULL, -- money
-    ActualCost numeric NULL,  -- money
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_WorkOrderRouting_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_WorkOrderRouting_ScheduledEndDate" CHECK (ScheduledEndDate >= ScheduledStartDate),
-    CONSTRAINT "CK_WorkOrderRouting_ActualEndDate" CHECK ((ActualEndDate >= ActualStartDate)
-        OR (ActualEndDate IS NULL) OR (ActualStartDate IS NULL)),
-    CONSTRAINT "CK_WorkOrderRouting_ActualResourceHrs" CHECK (ActualResourceHrs >= 0.0000),
-    CONSTRAINT "CK_WorkOrderRouting_PlannedCost" CHECK (PlannedCost > 0.00),
-    CONSTRAINT "CK_WorkOrderRouting_ActualCost" CHECK (ActualCost > 0.00)
+  create table work_order_routing(
+    work_order_id int not null,
+    product_id int not null,
+    operation_sequence smallint not null,
+    location_id smallint not null,
+    scheduled_start_date timestamp not null,
+    scheduled_end_date timestamp not null,
+    actual_start_date timestamp null,
+    actual_end_date timestamp null,
+    actual_resource_hrs decimal(9, 4) null,
+    planned_cost numeric not null, -- money
+    actual_cost numeric null,  -- money
+    modified_date timestamp not null constraint "df_work_order_routing_modified_date" default (now()),
+    constraint "ck_work_order_routing_scheduled_end_date" check (scheduled_end_date >= scheduled_start_date),
+    constraint "ck_work_order_routing_actual_end_date" check ((actual_end_date >= actual_start_date)
+        or (actual_end_date is null) or (actual_start_date is null)),
+    constraint "ck_work_order_routing_actual_resource_hrs" check (actual_resource_hrs >= 0.0000),
+    constraint "ck_work_order_routing_planned_cost" check (planned_cost > 0.00),
+    constraint "ck_work_order_routing_actual_cost" check (actual_cost > 0.00)
   );
 
-COMMENT ON SCHEMA Production IS 'Contains objects related to products, inventory, and manufacturing.';
+comment on schema production is 'contains objects related to products, inventory, and manufacturing.';
 
-SELECT 'Copying data into Production.BillOfMaterials';
-\copy Production.BillOfMaterials FROM 'BillOfMaterials.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.Culture';
-\copy Production.Culture FROM 'Culture.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.Document';
-\copy Production.Document FROM 'Document.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.ProductCategory';
-\copy Production.ProductCategory FROM 'ProductCategory.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.ProductSubcategory';
-\copy Production.ProductSubcategory FROM 'ProductSubcategory.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.ProductModel';
-\copy Production.ProductModel FROM 'ProductModel.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.Product';
-\copy Production.Product FROM 'Product.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.ProductCostHistory';
-\copy Production.ProductCostHistory FROM 'ProductCostHistory.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.ProductDescription';
-\copy Production.ProductDescription FROM 'ProductDescription.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.ProductDocument';
-\copy Production.ProductDocument FROM 'ProductDocument.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.Location';
-\copy Production.Location FROM 'Location.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.ProductInventory';
-\copy Production.ProductInventory FROM 'ProductInventory.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.ProductListPriceHistory';
-\copy Production.ProductListPriceHistory FROM 'ProductListPriceHistory.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.Illustration';
-\copy Production.Illustration FROM 'Illustration.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.ProductModelIllustration';
-\copy Production.ProductModelIllustration FROM 'ProductModelIllustration.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.ProductModelProductDescriptionCulture';
-\copy Production.ProductModelProductDescriptionCulture FROM 'ProductModelProductDescriptionCulture.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.ProductPhoto';
-\copy Production.ProductPhoto FROM 'ProductPhoto.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.ProductProductPhoto';
-\copy Production.ProductProductPhoto FROM 'ProductProductPhoto.csv' DELIMITER E'\t' CSV;
+select 'copying data into production.bill_of_materials';
+\copy production.bill_of_materials from 'BillOfMaterials.csv' delimiter e'\t' csv;
+select 'copying data into production.culture';
+\copy production.culture from 'Culture.csv' delimiter e'\t' csv;
+select 'copying data into production.document';
+\copy production.document from 'Document.csv' delimiter e'\t' csv;
+select 'copying data into production.product_category';
+\copy production.product_category from 'ProductCategory.csv' delimiter e'\t' csv;
+select 'copying data into production.product_subcategory';
+\copy production.product_subcategory from 'ProductSubcategory.csv' delimiter e'\t' csv;
+select 'copying data into production.product_model';
+\copy production.product_model from 'ProductModel.csv' delimiter e'\t' csv;
+select 'copying data into production.product';
+\copy production.product from 'Product.csv' delimiter e'\t' csv;
+select 'copying data into production.product_cost_history';
+\copy production.product_cost_history from 'ProductCostHistory.csv' delimiter e'\t' csv;
+select 'copying data into production.product_description';
+\copy production.product_description from 'ProductDescription.csv' delimiter e'\t' csv;
+select 'copying data into production.product_document';
+\copy production.product_document from 'ProductDocument.csv' delimiter e'\t' csv;
+select 'copying data into production.location';
+\copy production.location from 'Location.csv' delimiter e'\t' csv;
+select 'copying data into production.product_inventory';
+\copy production.product_inventory from 'ProductInventory.csv' delimiter e'\t' csv;
+select 'copying data into production.product_list_price_history';
+\copy production.product_list_price_history from 'ProductListPriceHistory.csv' delimiter e'\t' csv;
+select 'copying data into production.illustration';
+\copy production.illustration from 'Illustration.csv' delimiter e'\t' csv;
+select 'copying data into production.product_model_illustration';
+\copy production.product_model_illustration from 'ProductModelIllustration.csv' delimiter e'\t' csv;
+select 'copying data into production.product_model_product_description_culture';
+\copy production.product_model_product_description_culture from 'ProductModelProductDescriptionCulture.csv' delimiter e'\t' csv;
+select 'copying data into production.product_photo';
+\copy production.product_photo from 'ProductPhoto.csv' delimiter e'\t' csv;
+select 'copying data into production.product_product_photo';
+\copy production.product_product_photo from 'ProductProductPhoto.csv' delimiter e'\t' csv;
 
 -- This doesn't work:
 -- SELECT 'Copying data into Production.ProductReview';
 -- \copy Production.ProductReview FROM 'ProductReview.csv' DELIMITER '  ' CSV;
 
 -- so instead ...
-INSERT INTO Production.ProductReview (ProductReviewID, ProductID, ReviewerName, ReviewDate, EmailAddress, Rating, Comments, ModifiedDate) VALUES
+INSERT INTO production.product_review (product_review_id, product_id, reviewer_name, review_date, email_address, rating, comments, modified_date) VALUES
  (1, 709, 'John Smith', '2013-09-18 00:00:00', 'john@fourthcoffee.com', 5, 'I can''t believe I''m singing the praises of a pair of socks, but I just came back from a grueling
 3-day ride and these socks really helped make the trip a blast. They''re lightweight yet really cushioned my feet all day. 
 The reinforced toe is nearly bullet-proof and I didn''t experience any problems with rubbing or blisters like I have with
@@ -707,537 +707,536 @@ The Road-550-W frame is available in a variety of sizes and colors and has the s
 we think that after a test drive you''l find the quality and performance above and beyond . You''ll have a grin on your face and be itching to get out on the road for more. While designed for serious road racing, the Road-550-W would be an excellent choice for just about any terrain and 
 any level of experience. It''s a huge step in the right direction for female cyclists and well worth your consideration and hard-earned money.', '2013-11-15 00:00:00');
 
-SELECT 'Copying data into Production.ScrapReason';
-\copy Production.ScrapReason FROM 'ScrapReason.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.TransactionHistory';
-\copy Production.TransactionHistory FROM 'TransactionHistory.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.TransactionHistoryArchive';
-\copy Production.TransactionHistoryArchive FROM 'TransactionHistoryArchive.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.UnitMeasure';
-\copy Production.UnitMeasure FROM 'UnitMeasure.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.WorkOrder';
-\copy Production.WorkOrder FROM 'WorkOrder.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Production.WorkOrderRouting';
-\copy Production.WorkOrderRouting FROM 'WorkOrderRouting.csv' DELIMITER E'\t' CSV;
+select 'copying data into production.scrap_reason';
+\copy production.scrap_reason from 'ScrapReason.csv' delimiter e'\t' csv;
+select 'copying data into production.transaction_history';
+\copy production.transaction_history from 'TransactionHistory.csv' delimiter e'\t' csv;
+select 'copying data into production.transaction_history_archive';
+\copy production.transaction_history_archive from 'TransactionHistoryArchive.csv' delimiter e'\t' csv;
+select 'copying data into production.unit_measure';
+\copy production.unit_measure from 'UnitMeasure.csv' delimiter e'\t' csv;
+select 'copying data into production.work_order';
+\copy production.work_order from 'WorkOrder.csv' delimiter e'\t' csv;
+select 'copying data into production.work_order_routing';
+\copy production.work_order_routing from 'WorkOrderRouting.csv' delimiter e'\t' csv;
 
 -- Calculated columns that needed to be there just for the CSV import
-ALTER TABLE Production.WorkOrder DROP COLUMN StockedQty;
-ALTER TABLE Production.Document DROP COLUMN DocumentLevel;
+alter table production.work_order drop column stocked_qty;
+alter table production.document drop column document_level;
 
 -- Document HierarchyID column
-ALTER TABLE Production.Document ADD DocumentNode VARCHAR DEFAULT '/';
+alter table production.document add document_node varchar default '/';
 -- Convert from all the hex to a stream of hierarchyid bits
-WITH RECURSIVE hier AS (
-  SELECT rowguid, doc, get_byte(decode(substring(doc, 1, 2), 'hex'), 0)::bit(8)::varchar AS bits, 2 AS i
-    FROM Production.Document
-  UNION ALL
-  SELECT e.rowguid, e.doc, hier.bits || get_byte(decode(substring(e.doc, i + 1, 2), 'hex'), 0)::bit(8)::varchar, i + 2 AS i
-    FROM Production.Document AS e INNER JOIN
-      hier ON e.rowguid = hier.rowguid AND i < LENGTH(e.doc)
+with recursive hier as (
+  select rowguid, doc, get_byte(decode(substring(doc, 1, 2), 'hex'), 0)::bit(8)::varchar as bits, 2 as i
+    from production.document
+  union all
+  select e.rowguid, e.doc, hier.bits || get_byte(decode(substring(e.doc, i + 1, 2), 'hex'), 0)::bit(8)::varchar, i + 2 as i
+    from production.document as e inner join
+      hier on e.rowguid = hier.rowguid and i < length(e.doc)
 )
-UPDATE Production.Document AS emp
-  SET doc = COALESCE(trim(trailing '0' FROM hier.bits::TEXT), '')
-  FROM hier
-  WHERE emp.rowguid = hier.rowguid
-    AND (hier.doc IS NULL OR i = LENGTH(hier.doc));
+update production.document as emp
+  set doc = coalesce(trim(trailing '0' from hier.bits::text), '')
+  from hier
+  where emp.rowguid = hier.rowguid
+    and (hier.doc is null or i = length(hier.doc));
 
 -- Convert bits to the real hieararchy paths
-CREATE OR REPLACE FUNCTION f_ConvertDocNodes()
-  RETURNS void AS
+create or replace function f_convert_doc_nodes()
+  returns void as
 $func$
-DECLARE
-  got_none BOOLEAN;
-BEGIN
-  LOOP
+declare
+  got_none boolean;
+begin
+  loop
   got_none := true;
   -- 01 = 0-3
-  UPDATE Production.Document
-   SET DocumentNode = DocumentNode || SUBSTRING(doc, 3,2)::bit(2)::INTEGER::VARCHAR || CASE SUBSTRING(doc, 5, 1) WHEN '0' THEN '.' ELSE '/' END,
-     doc = SUBSTRING(doc, 6, 9999)
-    WHERE doc LIKE '01%';
-  IF FOUND THEN
+  update production.document
+   set document_node = document_node || substring(doc, 3,2)::bit(2)::integer::varchar || case substring(doc, 5, 1) when '0' then '.' else '/' end,
+     doc = substring(doc, 6, 9999)
+    where doc like '01%';
+  if found then
     got_none := false;
-  END IF;
+  end if;
 
   -- 100 = 4-7
-  UPDATE Production.Document
-   SET DocumentNode = DocumentNode || (SUBSTRING(doc, 4,2)::bit(2)::INTEGER + 4)::VARCHAR || CASE SUBSTRING(doc, 6, 1) WHEN '0' THEN '.' ELSE '/' END,
-     doc = SUBSTRING(doc, 7, 9999)
-    WHERE doc LIKE '100%';
-  IF FOUND THEN
+  update production.document
+   set document_node = document_node || (substring(doc, 4,2)::bit(2)::integer + 4)::varchar || case substring(doc, 6, 1) when '0' then '.' else '/' end,
+     doc = substring(doc, 7, 9999)
+    where doc like '100%';
+  if found then
     got_none := false;
-  END IF;
+  end if;
   
   -- 101 = 8-15
-  UPDATE Production.Document
-   SET DocumentNode = DocumentNode || (SUBSTRING(doc, 4,3)::bit(3)::INTEGER + 8)::VARCHAR || CASE SUBSTRING(doc, 7, 1) WHEN '0' THEN '.' ELSE '/' END,
-     doc = SUBSTRING(doc, 8, 9999)
-    WHERE doc LIKE '101%';
-  IF FOUND THEN
+  update production.document
+   set document_node = document_node || (substring(doc, 4,3)::bit(3)::integer + 8)::varchar || case substring(doc, 7, 1) when '0' then '.' else '/' end,
+     doc = substring(doc, 8, 9999)
+    where doc like '101%';
+  if found then
     got_none := false;
-  END IF;
+  end if;
 
   -- 110 = 16-79
-  UPDATE Production.Document
-   SET DocumentNode = DocumentNode || ((SUBSTRING(doc, 4,2)||SUBSTRING(doc, 7,1)||SUBSTRING(doc, 9,3))::bit(6)::INTEGER + 16)::VARCHAR || CASE SUBSTRING(doc, 12, 1) WHEN '0' THEN '.' ELSE '/' END,
-     doc = SUBSTRING(doc, 13, 9999)
-    WHERE doc LIKE '110%';
-  IF FOUND THEN
+  update production.document
+   set document_node = document_node || ((substring(doc, 4,2)||substring(doc, 7,1)||substring(doc, 9,3))::bit(6)::integer + 16)::varchar || case substring(doc, 12, 1) when '0' then '.' else '/' end,
+     doc = substring(doc, 13, 9999)
+    where doc like '110%';
+  if found then
     got_none := false;
-  END IF;
+  end if;
 
   -- 1110 = 80-1103
-  UPDATE Production.Document
-   SET DocumentNode = DocumentNode || ((SUBSTRING(doc, 5,3)||SUBSTRING(doc, 9,3)||SUBSTRING(doc, 13,1)||SUBSTRING(doc, 15,3))::bit(10)::INTEGER + 80)::VARCHAR || CASE SUBSTRING(doc, 18, 1) WHEN '0' THEN '.' ELSE '/' END,
-     doc = SUBSTRING(doc, 19, 9999)
-    WHERE doc LIKE '1110%';
-  IF FOUND THEN
+  update production.document
+   set document_node = document_node || ((substring(doc, 5,3)||substring(doc, 9,3)||substring(doc, 13,1)||substring(doc, 15,3))::bit(10)::integer + 80)::varchar || case substring(doc, 18, 1) when '0' then '.' else '/' end,
+     doc = substring(doc, 19, 9999)
+    where doc like '1110%';
+  if found then
     got_none := false;
-  END IF;
-  EXIT WHEN got_none;
-  END LOOP;
-END
-$func$ LANGUAGE plpgsql;
+  end if;
+  exit when got_none;
+  end loop;
+end
+$func$ language plpgsql;
 
-SELECT f_ConvertDocNodes();
+select f_convert_doc_nodes();
 -- Drop the original binary hierarchyid column
-ALTER TABLE Production.Document DROP COLUMN Doc;
-DROP FUNCTION f_ConvertDocNodes();
+alter table production.document drop column doc;
+drop function f_convert_doc_nodes();
 
 -- ProductDocument HierarchyID column
-  ALTER TABLE Production.ProductDocument ADD DocumentNode VARCHAR DEFAULT '/';
-ALTER TABLE Production.ProductDocument ADD rowguid uuid NOT NULL CONSTRAINT "DF_ProductDocument_rowguid" DEFAULT (uuid_generate_v1());
+  alter table production.product_document add document_node varchar default '/';
+alter table production.product_document add rowguid uuid not null constraint "df_product_document_rowguid" default (uuid_generate_v1());
 -- Convert from all the hex to a stream of hierarchyid bits
-WITH RECURSIVE hier AS (
-  SELECT rowguid, doc, get_byte(decode(substring(doc, 1, 2), 'hex'), 0)::bit(8)::varchar AS bits, 2 AS i
-    FROM Production.ProductDocument
-  UNION ALL
-  SELECT e.rowguid, e.doc, hier.bits || get_byte(decode(substring(e.doc, i + 1, 2), 'hex'), 0)::bit(8)::varchar, i + 2 AS i
-    FROM Production.ProductDocument AS e INNER JOIN
-      hier ON e.rowguid = hier.rowguid AND i < LENGTH(e.doc)
+with recursive hier as (
+  select rowguid, doc, get_byte(decode(substring(doc, 1, 2), 'hex'), 0)::bit(8)::varchar as bits, 2 as i
+    from production.product_document
+  union all
+  select e.rowguid, e.doc, hier.bits || get_byte(decode(substring(e.doc, i + 1, 2), 'hex'), 0)::bit(8)::varchar, i + 2 as i
+    from production.product_document as e inner join
+      hier on e.rowguid = hier.rowguid and i < length(e.doc)
 )
-UPDATE Production.ProductDocument AS emp
-  SET doc = COALESCE(trim(trailing '0' FROM hier.bits::TEXT), '')
-  FROM hier
-  WHERE emp.rowguid = hier.rowguid
-    AND (hier.doc IS NULL OR i = LENGTH(hier.doc));
+update production.product_document as emp
+  set doc = coalesce(trim(trailing '0' from hier.bits::text), '')
+  from hier
+  where emp.rowguid = hier.rowguid
+    and (hier.doc is null or i = length(hier.doc));
 
 -- Convert bits to the real hieararchy paths
-CREATE OR REPLACE FUNCTION f_ConvertDocNodes()
-  RETURNS void AS
+create or replace function f_convert_doc_nodes()
+  returns void as
 $func$
-DECLARE
-  got_none BOOLEAN;
-BEGIN
-  LOOP
+declare
+  got_none boolean;
+begin
+  loop
   got_none := true;
   -- 01 = 0-3
-  UPDATE Production.ProductDocument
-   SET DocumentNode = DocumentNode || SUBSTRING(doc, 3,2)::bit(2)::INTEGER::VARCHAR || CASE SUBSTRING(doc, 5, 1) WHEN '0' THEN '.' ELSE '/' END,
-     doc = SUBSTRING(doc, 6, 9999)
-    WHERE doc LIKE '01%';
-  IF FOUND THEN
+  update production.product_document
+   set document_node = document_node || substring(doc, 3,2)::bit(2)::integer::varchar || case substring(doc, 5, 1) when '0' then '.' else '/' end,
+     doc = substring(doc, 6, 9999)
+    where doc like '01%';
+  if found then
     got_none := false;
-  END IF;
+  end if;
 
   -- 100 = 4-7
-  UPDATE Production.ProductDocument
-   SET DocumentNode = DocumentNode || (SUBSTRING(doc, 4,2)::bit(2)::INTEGER + 4)::VARCHAR || CASE SUBSTRING(doc, 6, 1) WHEN '0' THEN '.' ELSE '/' END,
-     doc = SUBSTRING(doc, 7, 9999)
-    WHERE doc LIKE '100%';
-  IF FOUND THEN
+  update production.product_document
+   set document_node = document_node || (substring(doc, 4,2)::bit(2)::integer + 4)::varchar || case substring(doc, 6, 1) when '0' then '.' else '/' end,
+     doc = substring(doc, 7, 9999)
+    where doc like '100%';
+  if found then
     got_none := false;
-  END IF;
+  end if;
   
   -- 101 = 8-15
-  UPDATE Production.ProductDocument
-   SET DocumentNode = DocumentNode || (SUBSTRING(doc, 4,3)::bit(3)::INTEGER + 8)::VARCHAR || CASE SUBSTRING(doc, 7, 1) WHEN '0' THEN '.' ELSE '/' END,
-     doc = SUBSTRING(doc, 8, 9999)
-    WHERE doc LIKE '101%';
-  IF FOUND THEN
+  update production.product_document
+   set document_node = document_node || (substring(doc, 4,3)::bit(3)::integer + 8)::varchar || case substring(doc, 7, 1) when '0' then '.' else '/' end,
+     doc = substring(doc, 8, 9999)
+    where doc like '101%';
+  if found then
     got_none := false;
-  END IF;
+  end if;
 
   -- 110 = 16-79
-  UPDATE Production.ProductDocument
-   SET DocumentNode = DocumentNode || ((SUBSTRING(doc, 4,2)||SUBSTRING(doc, 7,1)||SUBSTRING(doc, 9,3))::bit(6)::INTEGER + 16)::VARCHAR || CASE SUBSTRING(doc, 12, 1) WHEN '0' THEN '.' ELSE '/' END,
-     doc = SUBSTRING(doc, 13, 9999)
-    WHERE doc LIKE '110%';
-  IF FOUND THEN
+  update production.product_document
+   set document_node = document_node || ((substring(doc, 4,2)||substring(doc, 7,1)||substring(doc, 9,3))::bit(6)::integer + 16)::varchar || case substring(doc, 12, 1) when '0' then '.' else '/' end,
+     doc = substring(doc, 13, 9999)
+    where doc like '110%';
+  if found then
     got_none := false;
-  END IF;
+  end if;
 
   -- 1110 = 80-1103
-  UPDATE Production.ProductDocument
-   SET DocumentNode = DocumentNode || ((SUBSTRING(doc, 5,3)||SUBSTRING(doc, 9,3)||SUBSTRING(doc, 13,1)||SUBSTRING(doc, 15,3))::bit(10)::INTEGER + 80)::VARCHAR || CASE SUBSTRING(doc, 18, 1) WHEN '0' THEN '.' ELSE '/' END,
-     doc = SUBSTRING(doc, 19, 9999)
-    WHERE doc LIKE '1110%';
-  IF FOUND THEN
+  update production.product_document
+   set document_node = document_node || ((substring(doc, 5,3)||substring(doc, 9,3)||substring(doc, 13,1)||substring(doc, 15,3))::bit(10)::integer + 80)::varchar || case substring(doc, 18, 1) when '0' then '.' else '/' end,
+     doc = substring(doc, 19, 9999)
+    where doc like '1110%';
+  if found then
     got_none := false;
-  END IF;
-  EXIT WHEN got_none;
-  END LOOP;
-END
-$func$ LANGUAGE plpgsql;
+  end if;
+  exit when got_none;
+  end loop;
+end
+$func$ language plpgsql;
 
-SELECT f_ConvertDocNodes();
+select f_convert_doc_nodes();
 -- Drop the original binary hierarchyid column
-ALTER TABLE Production.ProductDocument DROP COLUMN Doc;
-DROP FUNCTION f_ConvertDocNodes();
-ALTER TABLE Production.ProductDocument DROP COLUMN rowguid;
+alter table production.product_document drop column doc;
+drop function f_convert_doc_nodes();
+alter table production.product_document drop column rowguid;
 
 
 
 
 
-CREATE SCHEMA Purchasing
-  CREATE TABLE ProductVendor(
-    ProductID INT NOT NULL,
-    BusinessEntityID INT NOT NULL,
-    AverageLeadTime INT NOT NULL,
-    StandardPrice numeric NOT NULL, -- money
-    LastReceiptCost numeric NULL, -- money
-    LastReceiptDate TIMESTAMP NULL,
-    MinOrderQty INT NOT NULL,
-    MaxOrderQty INT NOT NULL,
-    OnOrderQty INT NULL,
-    UnitMeasureCode char(3) NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ProductVendor_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_ProductVendor_AverageLeadTime" CHECK (AverageLeadTime >= 1),
-    CONSTRAINT "CK_ProductVendor_StandardPrice" CHECK (StandardPrice > 0.00),
-    CONSTRAINT "CK_ProductVendor_LastReceiptCost" CHECK (LastReceiptCost > 0.00),
-    CONSTRAINT "CK_ProductVendor_MinOrderQty" CHECK (MinOrderQty >= 1),
-    CONSTRAINT "CK_ProductVendor_MaxOrderQty" CHECK (MaxOrderQty >= 1),
-    CONSTRAINT "CK_ProductVendor_OnOrderQty" CHECK (OnOrderQty >= 0)
+create schema purchasing
+  create table product_vendor(
+    product_id int not null,
+    business_entity_id int not null,
+    average_lead_time int not null,
+    standard_price numeric not null, -- money
+    last_receipt_cost numeric null, -- money
+    last_receipt_date timestamp null,
+    min_order_qty int not null,
+    max_order_qty int not null,
+    on_order_qty int null,
+    unit_measure_code char(3) not null,
+    modified_date timestamp not null constraint "df_product_vendor_modified_date" default (now()),
+    constraint "ck_product_vendor_average_lead_time" check (average_lead_time >= 1),
+    constraint "ck_product_vendor_standard_price" check (standard_price > 0.00),
+    constraint "ck_product_vendor_last_receipt_cost" check (last_receipt_cost > 0.00),
+    constraint "ck_product_vendor_min_order_qty" check (min_order_qty >= 1),
+    constraint "ck_product_vendor_max_order_qty" check (max_order_qty >= 1),
+    constraint "ck_product_vendor_on_order_qty" check (on_order_qty >= 0)
   )
-  CREATE TABLE PurchaseOrderDetail(
-    PurchaseOrderID INT NOT NULL,
-    PurchaseOrderDetailID SERIAL NOT NULL, -- int
-    DueDate TIMESTAMP NOT NULL,
-    OrderQty smallint NOT NULL,
-    ProductID INT NOT NULL,
-    UnitPrice numeric NOT NULL, -- money
-    LineTotal numeric, -- AS ISNULL(OrderQty * UnitPrice, 0.00),
-    ReceivedQty decimal(8, 2) NOT NULL,
-    RejectedQty decimal(8, 2) NOT NULL,
-    StockedQty numeric, -- AS ISNULL(ReceivedQty - RejectedQty, 0.00),
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_PurchaseOrderDetail_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_PurchaseOrderDetail_OrderQty" CHECK (OrderQty > 0),
-    CONSTRAINT "CK_PurchaseOrderDetail_UnitPrice" CHECK (UnitPrice >= 0.00),
-    CONSTRAINT "CK_PurchaseOrderDetail_ReceivedQty" CHECK (ReceivedQty >= 0.00),
-    CONSTRAINT "CK_PurchaseOrderDetail_RejectedQty" CHECK (RejectedQty >= 0.00)
+  create table purchase_order_detail(
+    purchase_order_id int not null,
+    purchase_order_detail_id serial not null, -- int
+    due_date timestamp not null,
+    order_qty smallint not null,
+    product_id int not null,
+    unit_price numeric not null, -- money
+    line_total numeric, -- as isnull(order_qty * unit_price, 0.00),
+    received_qty decimal(8, 2) not null,
+    rejected_qty decimal(8, 2) not null,
+    stocked_qty numeric, -- as isnull(received_qty - rejected_qty, 0.00),
+    modified_date timestamp not null constraint "df_purchase_order_detail_modified_date" default (now()),
+    constraint "ck_purchase_order_detail_order_qty" check (order_qty > 0),
+    constraint "ck_purchase_order_detail_unit_price" check (unit_price >= 0.00),
+    constraint "ck_purchase_order_detail_received_qty" check (received_qty >= 0.00),
+    constraint "ck_purchase_order_detail_rejected_qty" check (rejected_qty >= 0.00)
   )
-  CREATE TABLE PurchaseOrderHeader(
-    PurchaseOrderID SERIAL NOT NULL,  -- int
-    RevisionNumber smallint NOT NULL CONSTRAINT "DF_PurchaseOrderHeader_RevisionNumber" DEFAULT (0),  -- tinyint
-    Status smallint NOT NULL CONSTRAINT "DF_PurchaseOrderHeader_Status" DEFAULT (1),  -- tinyint
-    EmployeeID INT NOT NULL,
-    VendorID INT NOT NULL,
-    ShipMethodID INT NOT NULL,
-    OrderDate TIMESTAMP NOT NULL CONSTRAINT "DF_PurchaseOrderHeader_OrderDate" DEFAULT (NOW()),
-    ShipDate TIMESTAMP NULL,
-    SubTotal numeric NOT NULL CONSTRAINT "DF_PurchaseOrderHeader_SubTotal" DEFAULT (0.00),  -- money
-    TaxAmt numeric NOT NULL CONSTRAINT "DF_PurchaseOrderHeader_TaxAmt" DEFAULT (0.00),  -- money
-    Freight numeric NOT NULL CONSTRAINT "DF_PurchaseOrderHeader_Freight" DEFAULT (0.00),  -- money
-    TotalDue numeric, -- AS ISNULL(SubTotal + TaxAmt + Freight, 0) PERSISTED NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_PurchaseOrderHeader_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_PurchaseOrderHeader_Status" CHECK (Status BETWEEN 1 AND 4), -- 1 = Pending; 2 = Approved; 3 = Rejected; 4 = Complete
-    CONSTRAINT "CK_PurchaseOrderHeader_ShipDate" CHECK ((ShipDate >= OrderDate) OR (ShipDate IS NULL)),
-    CONSTRAINT "CK_PurchaseOrderHeader_SubTotal" CHECK (SubTotal >= 0.00),
-    CONSTRAINT "CK_PurchaseOrderHeader_TaxAmt" CHECK (TaxAmt >= 0.00),
-    CONSTRAINT "CK_PurchaseOrderHeader_Freight" CHECK (Freight >= 0.00)
+  create table purchase_order_header(
+    purchase_order_id serial not null,  -- int
+    revision_number smallint not null constraint "df_purchase_order_header_revision_number" default (0),  -- tinyint
+    status smallint not null constraint "df_purchase_order_header_status" default (1),  -- tinyint
+    employee_id int not null,
+    vendor_id int not null,
+    ship_method_id int not null,
+    order_date timestamp not null constraint "df_purchase_order_header_order_date" default (now()),
+    ship_date timestamp null,
+    sub_total numeric not null constraint "df_purchase_order_header_sub_total" default (0.00),  -- money
+    tax_amt numeric not null constraint "df_purchase_order_header_tax_amt" default (0.00),  -- money
+    freight numeric not null constraint "df_purchase_order_header_freight" default (0.00),  -- money
+    total_due numeric, -- as isnull(sub_total + tax_amt + freight, 0) persisted not null,
+    modified_date timestamp not null constraint "df_purchase_order_header_modified_date" default (now()),
+    constraint "ck_purchase_order_header_status" check (status between 1 and 4), -- 1 = pending; 2 = approved; 3 = rejected; 4 = complete
+    constraint "ck_purchase_order_header_ship_date" check ((ship_date >= order_date) or (ship_date is null)),
+    constraint "ck_purchase_order_header_sub_total" check (sub_total >= 0.00),
+    constraint "ck_purchase_order_header_tax_amt" check (tax_amt >= 0.00),
+    constraint "ck_purchase_order_header_freight" check (freight >= 0.00)
   )
-  CREATE TABLE ShipMethod(
-    ShipMethodID SERIAL NOT NULL, -- int
-    Name "Name" NOT NULL,
-    ShipBase numeric NOT NULL CONSTRAINT "DF_ShipMethod_ShipBase" DEFAULT (0.00), -- money
-    ShipRate numeric NOT NULL CONSTRAINT "DF_ShipMethod_ShipRate" DEFAULT (0.00), -- money
-    rowguid uuid NOT NULL CONSTRAINT "DF_ShipMethod_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ShipMethod_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_ShipMethod_ShipBase" CHECK (ShipBase > 0.00),
-    CONSTRAINT "CK_ShipMethod_ShipRate" CHECK (ShipRate > 0.00)
+  create table ship_method(
+    ship_method_id serial not null, -- int
+    name "name" not null,
+    ship_base numeric not null constraint "df_ship_method_ship_base" default (0.00), -- money
+    ship_rate numeric not null constraint "df_ship_method_ship_rate" default (0.00), -- money
+    rowguid uuid not null constraint "df_ship_method_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_ship_method_modified_date" default (now()),
+    constraint "ck_ship_method_ship_base" check (ship_base > 0.00),
+    constraint "ck_ship_method_ship_rate" check (ship_rate > 0.00)
   )
-  CREATE TABLE Vendor(
-    BusinessEntityID INT NOT NULL,
-    AccountNumber "AccountNumber" NOT NULL,
-    Name "Name" NOT NULL,
-    CreditRating smallint NOT NULL, -- tinyint
-    PreferredVendorStatus "Flag" NOT NULL CONSTRAINT "DF_Vendor_PreferredVendorStatus" DEFAULT (true),
-    ActiveFlag "Flag" NOT NULL CONSTRAINT "DF_Vendor_ActiveFlag" DEFAULT (true),
-    PurchasingWebServiceURL varchar(1024) NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_Vendor_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_Vendor_CreditRating" CHECK (CreditRating BETWEEN 1 AND 5)
+  create table vendor(
+    business_entity_id int not null,
+    account_number "account_number" not null,
+    name "name" not null,
+    credit_rating smallint not null, -- tinyint
+    preferred_vendor_status "flag" not null constraint "df_vendor_preferred_vendor_status" default (true),
+    active_flag "flag" not null constraint "df_vendor_active_flag" default (true),
+    purchasing_web_service_url varchar(1024) null,
+    modified_date timestamp not null constraint "df_vendor_modified_date" default (now()),
+    constraint "ck_vendor_credit_rating" check (credit_rating between 1 and 5)
   );
 
-COMMENT ON SCHEMA Purchasing IS 'Contains objects related to vendors and purchase orders.';
+comment on schema purchasing is 'contains objects related to vendors and purchase orders.';
 
-SELECT 'Copying data into Purchasing.ProductVendor';
-\copy Purchasing.ProductVendor FROM 'ProductVendor.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Purchasing.PurchaseOrderDetail';
-\copy Purchasing.PurchaseOrderDetail FROM 'PurchaseOrderDetail.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Purchasing.PurchaseOrderHeader';
-\copy Purchasing.PurchaseOrderHeader FROM 'PurchaseOrderHeader.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Purchasing.ShipMethod';
-\copy Purchasing.ShipMethod FROM 'ShipMethod.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Purchasing.Vendor';
-\copy Purchasing.Vendor FROM 'Vendor.csv' DELIMITER E'\t' CSV;
+select 'copying data into purchasing.product_vendor';
+\copy purchasing.product_vendor from 'ProductVendor.csv' delimiter e'\t' csv;
+select 'copying data into purchasing.purchase_order_detail';
+\copy purchasing.purchase_order_detail from 'PurchaseOrderDetail.csv' delimiter e'\t' csv;
+select 'copying data into purchasing.purchase_order_header';
+\copy purchasing.purchase_order_header from 'PurchaseOrderHeader.csv' delimiter e'\t' csv;
+select 'copying data into purchasing.ship_method';
+\copy purchasing.ship_method from 'ShipMethod.csv' delimiter e'\t' csv;
+select 'copying data into purchasing.vendor';
+\copy purchasing.vendor from 'Vendor.csv' delimiter e'\t' csv;
 
 -- Calculated columns that needed to be there just for the CSV import
-ALTER TABLE Purchasing.PurchaseOrderDetail DROP COLUMN LineTotal;
-ALTER TABLE Purchasing.PurchaseOrderDetail DROP COLUMN StockedQty;
-ALTER TABLE Purchasing.PurchaseOrderHeader DROP COLUMN TotalDue;
+alter table purchasing.purchase_order_detail drop column line_total;
+alter table purchasing.purchase_order_detail drop column stocked_qty;
+alter table purchasing.purchase_order_header drop column total_due;
 
 
 
-CREATE SCHEMA Sales
-  CREATE TABLE CountryRegionCurrency(
-    CountryRegionCode varchar(3) NOT NULL,
-    CurrencyCode char(3) NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_CountryRegionCurrency_ModifiedDate" DEFAULT (NOW())
+create schema sales
+  create table country_region_currency(
+    country_region_code varchar(3) not null,
+    currency_code char(3) not null,
+    modified_date timestamp not null constraint "df_country_region_currency_modified_date" default (now())
   )
-  CREATE TABLE CreditCard(
-    CreditCardID SERIAL NOT NULL, -- int
-    CardType varchar(50) NOT NULL,
-    CardNumber varchar(25) NOT NULL,
-    ExpMonth smallint NOT NULL, -- tinyint
-    ExpYear smallint NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_CreditCard_ModifiedDate" DEFAULT (NOW())
+  create table credit_card(
+    credit_card_id serial not null, -- int
+    card_type varchar(50) not null,
+    card_number varchar(25) not null,
+    exp_month smallint not null, -- tinyint
+    exp_year smallint not null,
+    modified_date timestamp not null constraint "df_credit_card_modified_date" default (now())
   )
-  CREATE TABLE Currency(
-    CurrencyCode char(3) NOT NULL,
-    Name "Name" NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_Currency_ModifiedDate" DEFAULT (NOW())
+  create table currency(
+    currency_code char(3) not null,
+    name "name" not null,
+    modified_date timestamp not null constraint "df_currency_modified_date" default (now())
   )
-  CREATE TABLE CurrencyRate(
-    CurrencyRateID SERIAL NOT NULL, -- int
-    CurrencyRateDate TIMESTAMP NOT NULL,   
-    FromCurrencyCode char(3) NOT NULL,
-    ToCurrencyCode char(3) NOT NULL,
-    AverageRate numeric NOT NULL, -- money
-    EndOfDayRate numeric NOT NULL,  -- money
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_CurrencyRate_ModifiedDate" DEFAULT (NOW())
+  create table currency_rate(
+    currency_rate_id serial not null, -- int
+    currency_rate_date timestamp not null,   
+    from_currency_code char(3) not null,
+    to_currency_code char(3) not null,
+    average_rate numeric not null, -- money
+    end_of_day_rate numeric not null,  -- money
+    modified_date timestamp not null constraint "df_currency_rate_modified_date" default (now())
   )
-  CREATE TABLE Customer(
-    CustomerID SERIAL NOT NULL, --  NOT FOR REPLICATION -- int
-    -- A customer may either be a person, a store, or a person who works for a store
-    PersonID INT NULL, -- If this customer represents a person, this is non-null
-    StoreID INT NULL,  -- If the customer is a store, or is associated with a store then this is non-null.
-    TerritoryID INT NULL,
-    AccountNumber VARCHAR, -- AS ISNULL('AW' + dbo.ufnLeadingZeros(CustomerID), ''),
-    rowguid uuid NOT NULL CONSTRAINT "DF_Customer_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_Customer_ModifiedDate" DEFAULT (NOW())
+  create table customer(
+    customer_id serial not null, --  not for replication -- int
+    -- a customer may either be a person, a store, or a person who works for a store
+    person_id int null, -- if this customer represents a person, this is non-null
+    store_id int null,  -- if the customer is a store, or is associated with a store then this is non-null.
+    territory_id int null,
+    account_number varchar, -- as isnull('aw' + dbo.ufn_leading_zeros(customer_id), ''),
+    rowguid uuid not null constraint "df_customer_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_customer_modified_date" default (now())
   )
-  CREATE TABLE PersonCreditCard(
-    BusinessEntityID INT NOT NULL,
-    CreditCardID INT NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_PersonCreditCard_ModifiedDate" DEFAULT (NOW())
+  create table person_credit_card(
+    business_entity_id int not null,
+    credit_card_id int not null,
+    modified_date timestamp not null constraint "df_person_credit_card_modified_date" default (now())
   )
-  CREATE TABLE SalesOrderDetail(
-    SalesOrderID INT NOT NULL,
-    SalesOrderDetailID SERIAL NOT NULL, -- int
-    CarrierTrackingNumber varchar(25) NULL,
-    OrderQty smallint NOT NULL,
-    ProductID INT NOT NULL,
-    SpecialOfferID INT NOT NULL,
-    UnitPrice numeric NOT NULL, -- money
-    UnitPriceDiscount numeric NOT NULL CONSTRAINT "DF_SalesOrderDetail_UnitPriceDiscount" DEFAULT (0.0), -- money
-    LineTotal numeric, -- AS ISNULL(UnitPrice * (1.0 - UnitPriceDiscount) * OrderQty, 0.0),
-    rowguid uuid NOT NULL CONSTRAINT "DF_SalesOrderDetail_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_SalesOrderDetail_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_SalesOrderDetail_OrderQty" CHECK (OrderQty > 0),
-    CONSTRAINT "CK_SalesOrderDetail_UnitPrice" CHECK (UnitPrice >= 0.00),
-    CONSTRAINT "CK_SalesOrderDetail_UnitPriceDiscount" CHECK (UnitPriceDiscount >= 0.00)
+  create table sales_order_detail(
+    sales_order_id int not null,
+    sales_order_detail_id serial not null, -- int
+    carrier_tracking_number varchar(25) null,
+    order_qty smallint not null,
+    product_id int not null,
+    special_offer_id int not null,
+    unit_price numeric not null, -- money
+    unit_price_discount numeric not null constraint "df_sales_order_detail_unit_price_discount" default (0.0), -- money
+    line_total numeric, -- as isnull(unit_price * (1.0 - unit_price_discount) * order_qty, 0.0),
+    rowguid uuid not null constraint "df_sales_order_detail_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_sales_order_detail_modified_date" default (now()),
+    constraint "ck_sales_order_detail_order_qty" check (order_qty > 0),
+    constraint "ck_sales_order_detail_unit_price" check (unit_price >= 0.00),
+    constraint "ck_sales_order_detail_unit_price_discount" check (unit_price_discount >= 0.00)
   )
-  CREATE TABLE SalesOrderHeader(
-    SalesOrderID SERIAL NOT NULL, --  NOT FOR REPLICATION -- int
-    RevisionNumber smallint NOT NULL CONSTRAINT "DF_SalesOrderHeader_RevisionNumber" DEFAULT (0), -- tinyint
-    OrderDate TIMESTAMP NOT NULL CONSTRAINT "DF_SalesOrderHeader_OrderDate" DEFAULT (NOW()),
-    DueDate TIMESTAMP NOT NULL,
-    ShipDate TIMESTAMP NULL,
-    Status smallint NOT NULL CONSTRAINT "DF_SalesOrderHeader_Status" DEFAULT (1), -- tinyint
-    OnlineOrderFlag "Flag" NOT NULL CONSTRAINT "DF_SalesOrderHeader_OnlineOrderFlag" DEFAULT (true),
-    SalesOrderNumber VARCHAR(23), -- AS ISNULL(N'SO' + CONVERT(nvarchar(23), SalesOrderID), N'*** ERROR ***'),
-    PurchaseOrderNumber "OrderNumber" NULL,
-    AccountNumber "AccountNumber" NULL,
-    CustomerID INT NOT NULL,
-    SalesPersonID INT NULL,
-    TerritoryID INT NULL,
-    BillToAddressID INT NOT NULL,
-    ShipToAddressID INT NOT NULL,
-    ShipMethodID INT NOT NULL,
-    CreditCardID INT NULL,
-    CreditCardApprovalCode varchar(15) NULL,   
-    CurrencyRateID INT NULL,
-    SubTotal numeric NOT NULL CONSTRAINT "DF_SalesOrderHeader_SubTotal" DEFAULT (0.00), -- money
-    TaxAmt numeric NOT NULL CONSTRAINT "DF_SalesOrderHeader_TaxAmt" DEFAULT (0.00), -- money
-    Freight numeric NOT NULL CONSTRAINT "DF_SalesOrderHeader_Freight" DEFAULT (0.00), -- money
-    TotalDue numeric, -- AS ISNULL(SubTotal + TaxAmt + Freight, 0),
-    Comment varchar(128) NULL,
-    rowguid uuid NOT NULL CONSTRAINT "DF_SalesOrderHeader_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_SalesOrderHeader_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_SalesOrderHeader_Status" CHECK (Status BETWEEN 0 AND 8),
-    CONSTRAINT "CK_SalesOrderHeader_DueDate" CHECK (DueDate >= OrderDate),
-    CONSTRAINT "CK_SalesOrderHeader_ShipDate" CHECK ((ShipDate >= OrderDate) OR (ShipDate IS NULL)),
-    CONSTRAINT "CK_SalesOrderHeader_SubTotal" CHECK (SubTotal >= 0.00),
-    CONSTRAINT "CK_SalesOrderHeader_TaxAmt" CHECK (TaxAmt >= 0.00),
-    CONSTRAINT "CK_SalesOrderHeader_Freight" CHECK (Freight >= 0.00)
+  create table sales_order_header(
+    sales_order_id serial not null, --  not for replication -- int
+    revision_number smallint not null constraint "df_sales_order_header_revision_number" default (0), -- tinyint
+    order_date timestamp not null constraint "df_sales_order_header_order_date" default (now()),
+    due_date timestamp not null,
+    ship_date timestamp null,
+    status smallint not null constraint "df_sales_order_header_status" default (1), -- tinyint
+    online_order_flag "flag" not null constraint "df_sales_order_header_online_order_flag" default (true),
+    sales_order_number varchar(23), -- as isnull(n'so' + convert(nvarchar(23), sales_order_id), n'*** error ***'),
+    purchase_order_number "order_number" null,
+    account_number "account_number" null,
+    customer_id int not null,
+    sales_person_id int null,
+    territory_id int null,
+    bill_to_address_id int not null,
+    ship_to_address_id int not null,
+    ship_method_id int not null,
+    credit_card_id int null,
+    credit_card_approval_code varchar(15) null,   
+    currency_rate_id int null,
+    sub_total numeric not null constraint "df_sales_order_header_sub_total" default (0.00), -- money
+    tax_amt numeric not null constraint "df_sales_order_header_tax_amt" default (0.00), -- money
+    freight numeric not null constraint "df_sales_order_header_freight" default (0.00), -- money
+    total_due numeric, -- as isnull(sub_total + tax_amt + freight, 0),
+    comment varchar(128) null,
+    rowguid uuid not null constraint "df_sales_order_header_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_sales_order_header_modified_date" default (now()),
+    constraint "ck_sales_order_header_status" check (status between 0 and 8),
+    constraint "ck_sales_order_header_due_date" check (due_date >= order_date),
+    constraint "ck_sales_order_header_ship_date" check ((ship_date >= order_date) or (ship_date is null)),
+    constraint "ck_sales_order_header_sub_total" check (sub_total >= 0.00),
+    constraint "ck_sales_order_header_tax_amt" check (tax_amt >= 0.00),
+    constraint "ck_sales_order_header_freight" check (freight >= 0.00)
   )
-  CREATE TABLE SalesOrderHeaderSalesReason(
-    SalesOrderID INT NOT NULL,
-    SalesReasonID INT NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_SalesOrderHeaderSalesReason_ModifiedDate" DEFAULT (NOW())
+  create table sales_order_header_sales_reason(
+    sales_order_id int not null,
+    sales_reason_id int not null,
+    modified_date timestamp not null constraint "df_sales_order_header_sales_reason_modified_date" default (now())
   )
-  CREATE TABLE SalesPerson(
-    BusinessEntityID INT NOT NULL,
-    TerritoryID INT NULL,
-    SalesQuota numeric NULL, -- money
-    Bonus numeric NOT NULL CONSTRAINT "DF_SalesPerson_Bonus" DEFAULT (0.00), -- money
-    CommissionPct numeric NOT NULL CONSTRAINT "DF_SalesPerson_CommissionPct" DEFAULT (0.00), -- smallmoney -- money
-    SalesYTD numeric NOT NULL CONSTRAINT "DF_SalesPerson_SalesYTD" DEFAULT (0.00), -- money
-    SalesLastYear numeric NOT NULL CONSTRAINT "DF_SalesPerson_SalesLastYear" DEFAULT (0.00), -- money
-    rowguid uuid NOT NULL CONSTRAINT "DF_SalesPerson_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_SalesPerson_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_SalesPerson_SalesQuota" CHECK (SalesQuota > 0.00),
-    CONSTRAINT "CK_SalesPerson_Bonus" CHECK (Bonus >= 0.00),
-    CONSTRAINT "CK_SalesPerson_CommissionPct" CHECK (CommissionPct >= 0.00),
-    CONSTRAINT "CK_SalesPerson_SalesYTD" CHECK (SalesYTD >= 0.00),
-    CONSTRAINT "CK_SalesPerson_SalesLastYear" CHECK (SalesLastYear >= 0.00)
+  create table sales_person(
+    business_entity_id int not null,
+    territory_id int null,
+    sales_quota numeric null, -- money
+    bonus numeric not null constraint "df_sales_person_bonus" default (0.00), -- money
+    commission_pct numeric not null constraint "df_sales_person_commission_pct" default (0.00), -- smallmoney -- money
+    sales_ytd numeric not null constraint "df_sales_person_sales_ytd" default (0.00), -- money
+    sales_last_year numeric not null constraint "df_sales_person_sales_last_year" default (0.00), -- money
+    rowguid uuid not null constraint "df_sales_person_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_sales_person_modified_date" default (now()),
+    constraint "ck_sales_person_sales_quota" check (sales_quota > 0.00),
+    constraint "ck_sales_person_bonus" check (bonus >= 0.00),
+    constraint "ck_sales_person_commission_pct" check (commission_pct >= 0.00),
+    constraint "ck_sales_person_sales_ytd" check (sales_ytd >= 0.00),
+    constraint "ck_sales_person_sales_last_year" check (sales_last_year >= 0.00)
   )
-  CREATE TABLE SalesPersonQuotaHistory(
-    BusinessEntityID INT NOT NULL,
-    QuotaDate TIMESTAMP NOT NULL,
-    SalesQuota numeric NOT NULL, -- money
-    rowguid uuid NOT NULL CONSTRAINT "DF_SalesPersonQuotaHistory_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_SalesPersonQuotaHistory_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_SalesPersonQuotaHistory_SalesQuota" CHECK (SalesQuota > 0.00)
+  create table sales_person_quota_history(
+    business_entity_id int not null,
+    quota_date timestamp not null,
+    sales_quota numeric not null, -- money
+    rowguid uuid not null constraint "df_sales_person_quota_history_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_sales_person_quota_history_modified_date" default (now()),
+    constraint "ck_sales_person_quota_history_sales_quota" check (sales_quota > 0.00)
   )
-  CREATE TABLE SalesReason(
-    SalesReasonID SERIAL NOT NULL, -- int
-    Name "Name" NOT NULL,
-    ReasonType "Name" NOT NULL,
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_SalesReason_ModifiedDate" DEFAULT (NOW())
+  create table sales_reason(
+    sales_reason_id serial not null, -- int
+    name "name" not null,
+    reason_type "name" not null,
+    modified_date timestamp not null constraint "df_sales_reason_modified_date" default (now())
   )
-  CREATE TABLE SalesTaxRate(
-    SalesTaxRateID SERIAL NOT NULL, -- int
-    StateProvinceID INT NOT NULL,
-    TaxType smallint NOT NULL, -- tinyint
-    TaxRate numeric NOT NULL CONSTRAINT "DF_SalesTaxRate_TaxRate" DEFAULT (0.00), -- smallmoney -- money
-    Name "Name" NOT NULL,
-    rowguid uuid NOT NULL CONSTRAINT "DF_SalesTaxRate_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_SalesTaxRate_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_SalesTaxRate_TaxType" CHECK (TaxType BETWEEN 1 AND 3)
+  create table sales_tax_rate(
+    sales_tax_rate_id serial not null, -- int
+    state_province_id int not null,
+    tax_type smallint not null, -- tinyint
+    tax_rate numeric not null constraint "df_sales_tax_rate_tax_rate" default (0.00), -- smallmoney -- money
+    name "name" not null,
+    rowguid uuid not null constraint "df_sales_tax_rate_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_sales_tax_rate_modified_date" default (now()),
+    constraint "ck_sales_tax_rate_tax_type" check (tax_type between 1 and 3)
   )
-  CREATE TABLE SalesTerritory(
-    TerritoryID SERIAL NOT NULL, -- int
-    Name "Name" NOT NULL,
-    CountryRegionCode varchar(3) NOT NULL,
-    "group" varchar(50) NOT NULL, -- Group
-    SalesYTD numeric NOT NULL CONSTRAINT "DF_SalesTerritory_SalesYTD" DEFAULT (0.00), -- money
-    SalesLastYear numeric NOT NULL CONSTRAINT "DF_SalesTerritory_SalesLastYear" DEFAULT (0.00), -- money
-    CostYTD numeric NOT NULL CONSTRAINT "DF_SalesTerritory_CostYTD" DEFAULT (0.00), -- money
-    CostLastYear numeric NOT NULL CONSTRAINT "DF_SalesTerritory_CostLastYear" DEFAULT (0.00), -- money
-    rowguid uuid NOT NULL CONSTRAINT "DF_SalesTerritory_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_SalesTerritory_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_SalesTerritory_SalesYTD" CHECK (SalesYTD >= 0.00),
-    CONSTRAINT "CK_SalesTerritory_SalesLastYear" CHECK (SalesLastYear >= 0.00),
-    CONSTRAINT "CK_SalesTerritory_CostYTD" CHECK (CostYTD >= 0.00),
-    CONSTRAINT "CK_SalesTerritory_CostLastYear" CHECK (CostLastYear >= 0.00)
+  create table sales_territory(
+    territory_id serial not null, -- int
+    name "name" not null,
+    country_region_code varchar(3) not null,
+    "group" varchar(50) not null, -- group
+    sales_ytd numeric not null constraint "df_sales_territory_sales_ytd" default (0.00), -- money
+    sales_last_year numeric not null constraint "df_sales_territory_sales_last_year" default (0.00), -- money
+    cost_ytd numeric not null constraint "df_sales_territory_cost_ytd" default (0.00), -- money
+    cost_last_year numeric not null constraint "df_sales_territory_cost_last_year" default (0.00), -- money
+    rowguid uuid not null constraint "df_sales_territory_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_sales_territory_modified_date" default (now()),
+    constraint "ck_sales_territory_sales_ytd" check (sales_ytd >= 0.00),
+    constraint "ck_sales_territory_sales_last_year" check (sales_last_year >= 0.00),
+    constraint "ck_sales_territory_cost_ytd" check (cost_ytd >= 0.00),
+    constraint "ck_sales_territory_cost_last_year" check (cost_last_year >= 0.00)
   )
-  CREATE TABLE SalesTerritoryHistory(
-    BusinessEntityID INT NOT NULL,  -- A sales person
-    TerritoryID INT NOT NULL,
-    StartDate TIMESTAMP NOT NULL,
-    EndDate TIMESTAMP NULL,
-    rowguid uuid NOT NULL CONSTRAINT "DF_SalesTerritoryHistory_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_SalesTerritoryHistory_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_SalesTerritoryHistory_EndDate" CHECK ((EndDate >= StartDate) OR (EndDate IS NULL))
+  create table sales_territory_history(
+    business_entity_id int not null,  -- a sales person
+    territory_id int not null,
+    start_date timestamp not null,
+    end_date timestamp null,
+    rowguid uuid not null constraint "df_sales_territory_history_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_sales_territory_history_modified_date" default (now()),
+    constraint "ck_sales_territory_history_end_date" check ((end_date >= start_date) or (end_date is null))
   )
-  CREATE TABLE ShoppingCartItem(
-    ShoppingCartItemID SERIAL NOT NULL, -- int
-    ShoppingCartID varchar(50) NOT NULL,
-    Quantity INT NOT NULL CONSTRAINT "DF_ShoppingCartItem_Quantity" DEFAULT (1),
-    ProductID INT NOT NULL,
-    DateCreated TIMESTAMP NOT NULL CONSTRAINT "DF_ShoppingCartItem_DateCreated" DEFAULT (NOW()),
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_ShoppingCartItem_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_ShoppingCartItem_Quantity" CHECK (Quantity >= 1)
+  create table shopping_cart_item(
+    shopping_cart_item_id serial not null, -- int
+    shopping_cart_id varchar(50) not null,
+    quantity int not null constraint "df_shopping_cart_item_quantity" default (1),
+    product_id int not null,
+    date_created timestamp not null constraint "df_shopping_cart_item_date_created" default (now()),
+    modified_date timestamp not null constraint "df_shopping_cart_item_modified_date" default (now()),
+    constraint "ck_shopping_cart_item_quantity" check (quantity >= 1)
   )
-  CREATE TABLE SpecialOffer(
-    SpecialOfferID SERIAL NOT NULL, -- int
-    Description varchar(255) NOT NULL,
-    DiscountPct numeric NOT NULL CONSTRAINT "DF_SpecialOffer_DiscountPct" DEFAULT (0.00), -- smallmoney -- money
-    Type varchar(50) NOT NULL,
-    Category varchar(50) NOT NULL,
-    StartDate TIMESTAMP NOT NULL,
-    EndDate TIMESTAMP NOT NULL,
-    MinQty INT NOT NULL CONSTRAINT "DF_SpecialOffer_MinQty" DEFAULT (0),
-    MaxQty INT NULL,
-    rowguid uuid NOT NULL CONSTRAINT "DF_SpecialOffer_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_SpecialOffer_ModifiedDate" DEFAULT (NOW()),
-    CONSTRAINT "CK_SpecialOffer_EndDate" CHECK (EndDate >= StartDate),
-    CONSTRAINT "CK_SpecialOffer_DiscountPct" CHECK (DiscountPct >= 0.00),
-    CONSTRAINT "CK_SpecialOffer_MinQty" CHECK (MinQty >= 0),
-    CONSTRAINT "CK_SpecialOffer_MaxQty"  CHECK (MaxQty >= 0)
+  create table special_offer(
+    special_offer_id serial not null, -- int
+    description varchar(255) not null,
+    discount_pct numeric not null constraint "df_special_offer_discount_pct" default (0.00), -- smallmoney -- money
+    type varchar(50) not null,
+    category varchar(50) not null,
+    start_date timestamp not null,
+    end_date timestamp not null,
+    min_qty int not null constraint "df_special_offer_min_qty" default (0),
+    max_qty int null,
+    rowguid uuid not null constraint "df_special_offer_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_special_offer_modified_date" default (now()),
+    constraint "ck_special_offer_end_date" check (end_date >= start_date),
+    constraint "ck_special_offer_discount_pct" check (discount_pct >= 0.00),
+    constraint "ck_special_offer_min_qty" check (min_qty >= 0),
+    constraint "ck_special_offer_max_qty"  check (max_qty >= 0)
   )
-  CREATE TABLE SpecialOfferProduct(
-    SpecialOfferID INT NOT NULL,
-    ProductID INT NOT NULL,
-    rowguid uuid NOT NULL CONSTRAINT "DF_SpecialOfferProduct_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_SpecialOfferProduct_ModifiedDate" DEFAULT (NOW())
+  create table special_offer_product(
+    special_offer_id int not null,
+    product_id int not null,
+    rowguid uuid not null constraint "df_special_offer_product_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_special_offer_product_modified_date" default (now())
   )
-  CREATE TABLE Store(
-    BusinessEntityID INT NOT NULL,
-    Name "Name" NOT NULL,
-    SalesPersonID INT NULL,
-    Demographics XML NULL, -- XML(Sales.StoreSurveySchemaCollection)
-    rowguid uuid NOT NULL CONSTRAINT "DF_Store_rowguid" DEFAULT (uuid_generate_v1()), -- ROWGUIDCOL
-    ModifiedDate TIMESTAMP NOT NULL CONSTRAINT "DF_Store_ModifiedDate" DEFAULT (NOW())
+  create table store(
+    business_entity_id int not null,
+    name "name" not null,
+    sales_person_id int null,
+    demographics xml null, -- xml(sales.store_survey_schema_collection)
+    rowguid uuid not null constraint "df_store_rowguid" default (uuid_generate_v1()), -- rowguidcol
+    modified_date timestamp not null constraint "df_store_modified_date" default (now())
   );
 
-COMMENT ON SCHEMA Sales IS 'Contains objects related to customers, sales orders, and sales territories.';
+comment on schema sales is 'contains objects related to customers, sales orders, and sales territories.';
 
-SELECT 'Copying data into Sales.CountryRegionCurrency';
-\copy Sales.CountryRegionCurrency FROM 'CountryRegionCurrency.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.CreditCard';
-\copy Sales.CreditCard FROM 'CreditCard.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.Currency';
-\copy Sales.Currency FROM 'Currency.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.CurrencyRate';
-\copy Sales.CurrencyRate FROM 'CurrencyRate.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.Customer';
-\copy Sales.Customer FROM 'Customer.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.PersonCreditCard';
-\copy Sales.PersonCreditCard FROM 'PersonCreditCard.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.SalesOrderDetail';
-\copy Sales.SalesOrderDetail FROM 'SalesOrderDetail.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.SalesOrderHeader';
-\copy Sales.SalesOrderHeader FROM 'SalesOrderHeader.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.SalesOrderHeaderSalesReason';
-\copy Sales.SalesOrderHeaderSalesReason FROM 'SalesOrderHeaderSalesReason.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.SalesPerson';
-\copy Sales.SalesPerson FROM 'SalesPerson.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.SalesPersonQuotaHistory';
-\copy Sales.SalesPersonQuotaHistory FROM 'SalesPersonQuotaHistory.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.SalesReason';
-\copy Sales.SalesReason FROM 'SalesReason.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.SalesTaxRate';
-\copy Sales.SalesTaxRate FROM 'SalesTaxRate.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.SalesTerritory';
-\copy Sales.SalesTerritory FROM 'SalesTerritory.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.SalesTerritoryHistory';
-\copy Sales.SalesTerritoryHistory FROM 'SalesTerritoryHistory.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.ShoppingCartItem';
-\copy Sales.ShoppingCartItem FROM 'ShoppingCartItem.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.SpecialOffer';
-\copy Sales.SpecialOffer FROM 'SpecialOffer.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.SpecialOfferProduct';
-\copy Sales.SpecialOfferProduct FROM 'SpecialOfferProduct.csv' DELIMITER E'\t' CSV;
-SELECT 'Copying data into Sales.Store';
-\copy Sales.Store FROM 'Store.csv' DELIMITER E'\t' CSV;
-
+SELECT 'Copying data into sales.country_region_currency';
+\copy sales.country_region_currency FROM 'CountryRegionCurrency.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.credit_card';
+\copy sales.credit_card FROM 'CreditCard.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.currency';
+\copy sales.currency FROM 'Currency.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.currency_rate';
+\copy sales.currency_rate FROM 'CurrencyRate.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.customer';
+\copy sales.customer FROM 'Customer.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.person_credit_card';
+\copy sales.person_credit_card FROM 'PersonCreditCard.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.sales_order_detail';
+\copy sales.sales_order_detail FROM 'SalesOrderDetail.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.sales_order_header';
+\copy sales.sales_order_header FROM 'SalesOrderHeader.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.sales_order_header_sales_reason';
+\copy sales.sales_order_header_sales_reason FROM 'SalesOrderHeaderSalesReason.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.sales_person';
+\copy sales.sales_person FROM 'SalesPerson.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.sales_person_quota_history';
+\copy sales.sales_person_quota_history FROM 'SalesPersonQuotaHistory.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.sales_reason';
+\copy sales.sales_reason FROM 'SalesReason.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.sales_tax_rate';
+\copy sales.sales_tax_rate FROM 'SalesTaxRate.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.sales_territory';
+\copy sales.sales_territory FROM 'SalesTerritory.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.sales_territory_history';
+\copy sales.sales_territory_history FROM 'SalesTerritoryHistory.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.shopping_cart_item';
+\copy sales.shopping_cart_item FROM 'ShoppingCartItem.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.special_offer';
+\copy sales.special_offer FROM 'SpecialOffer.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.special_offer_product';
+\copy sales.special_offer_product FROM 'SpecialOfferProduct.csv' DELIMITER E'\t' CSV;
+SELECT 'Copying data into sales.store';
+\copy sales.store FROM 'Store.csv' DELIMITER E'\t' CSV;
 -- Calculated columns that needed to be there just for the CSV import
-ALTER TABLE Sales.Customer DROP COLUMN AccountNumber;
-ALTER TABLE Sales.SalesOrderDetail DROP COLUMN LineTotal;
-ALTER TABLE Sales.SalesOrderHeader DROP COLUMN SalesOrderNumber;
+alter table sales.customer drop column account_number;
+alter table sales.sales_order_detail drop column line_total;
+alter table sales.sales_order_header drop column sales_order_number;
 
 
 
@@ -1245,7 +1244,7 @@ ALTER TABLE Sales.SalesOrderHeader DROP COLUMN SalesOrderNumber;
 -- TABLE AND COLUMN COMMENTS
 -------------------------------------
 
-SET CLIENT_ENCODING=latin1;
+set client_encoding=latin1;
 
 -- COMMENT ON TABLE dbo.AWBuildVersion IS 'Current version number of the AdventureWorks2012_CS sample database.';
 --   COMMENT ON COLUMN dbo.AWBuildVersion.SystemInformationID IS 'Primary key for AWBuildVersion records.';
@@ -1272,510 +1271,510 @@ SET CLIENT_ENCODING=latin1;
 --   COMMENT ON COLUMN dbo.ErrorLog.ErrorLine IS 'The line number at which the error occurred.';
 --   COMMENT ON COLUMN dbo.ErrorLog.ErrorMessage IS 'The message text of the error that occurred.';
 
-COMMENT ON TABLE Person.Address IS 'Street address information for customers, employees, and vendors.';
-  COMMENT ON COLUMN Person.Address.AddressID IS 'Primary key for Address records.';
-  COMMENT ON COLUMN Person.Address.AddressLine1 IS 'First street address line.';
-  COMMENT ON COLUMN Person.Address.AddressLine2 IS 'Second street address line.';
-  COMMENT ON COLUMN Person.Address.City IS 'Name of the city.';
-  COMMENT ON COLUMN Person.Address.StateProvinceID IS 'Unique identification number for the state or province. Foreign key to StateProvince table.';
-  COMMENT ON COLUMN Person.Address.PostalCode IS 'Postal code for the street address.';
-  COMMENT ON COLUMN Person.Address.SpatialLocation IS 'Latitude and longitude of this address.';
+comment on table person.address is 'street address information for customers, employees, and vendors.';
+  comment on column person.address.address_id is 'primary key for address records.';
+  comment on column person.address.address_line1 is 'first street address line.';
+  comment on column person.address.address_line2 is 'second street address line.';
+  comment on column person.address.city is 'name of the city.';
+  comment on column person.address.state_province_id is 'unique identification number for the state or province. foreign key to state_province table.';
+  comment on column person.address.postal_code is 'postal code for the street address.';
+  comment on column person.address.spatial_location is 'latitude and longitude of this address.';
 
-COMMENT ON TABLE Person.AddressType IS 'Types of addresses stored in the Address table.';
-  COMMENT ON COLUMN Person.AddressType.AddressTypeID IS 'Primary key for AddressType records.';
-  COMMENT ON COLUMN Person.AddressType.Name IS 'Address type description. For example, Billing, Home, or Shipping.';
+comment on table person.address_type is 'types of addresses stored in the address table.';
+  comment on column person.address_type.address_type_id is 'primary key for address_type records.';
+  comment on column person.address_type.name is 'address type description. for example, billing, home, or shipping.';
 
-COMMENT ON TABLE Production.BillOfMaterials IS 'Items required to make bicycles and bicycle subassemblies. It identifies the heirarchical relationship between a parent product and its components.';
-  COMMENT ON COLUMN Production.BillOfMaterials.BillOfMaterialsID IS 'Primary key for BillOfMaterials records.';
-  COMMENT ON COLUMN Production.BillOfMaterials.ProductAssemblyID IS 'Parent product identification number. Foreign key to Product.ProductID.';
-  COMMENT ON COLUMN Production.BillOfMaterials.ComponentID IS 'Component identification number. Foreign key to Product.ProductID.';
-  COMMENT ON COLUMN Production.BillOfMaterials.StartDate IS 'Date the component started being used in the assembly item.';
-  COMMENT ON COLUMN Production.BillOfMaterials.EndDate IS 'Date the component stopped being used in the assembly item.';
-  COMMENT ON COLUMN Production.BillOfMaterials.UnitMeasureCode IS 'Standard code identifying the unit of measure for the quantity.';
-  COMMENT ON COLUMN Production.BillOfMaterials.BOMLevel IS 'Indicates the depth the component is from its parent (AssemblyID).';
-  COMMENT ON COLUMN Production.BillOfMaterials.PerAssemblyQty IS 'Quantity of the component needed to create the assembly.';
+comment on table production.bill_of_materials is 'items required to make bicycles and bicycle subassemblies. it identifies the heirarchical relationship between a parent product and its components.';
+  comment on column production.bill_of_materials.bill_of_materials_id is 'primary key for bill_of_materials records.';
+  comment on column production.bill_of_materials.product_assembly_id is 'parent product identification number. foreign key to product.product_id.';
+  comment on column production.bill_of_materials.component_id is 'component identification number. foreign key to product.product_id.';
+  comment on column production.bill_of_materials.start_date is 'date the component started being used in the assembly item.';
+  comment on column production.bill_of_materials.end_date is 'date the component stopped being used in the assembly item.';
+  comment on column production.bill_of_materials.unit_measure_code is 'standard code identifying the unit of measure for the quantity.';
+  comment on column production.bill_of_materials.bom_level is 'indicates the depth the component is from its parent (assembly_id).';
+  comment on column production.bill_of_materials.per_assembly_qty is 'quantity of the component needed to create the assembly.';
 
-COMMENT ON TABLE Person.BusinessEntity IS 'Source of the ID that connects vendors, customers, and employees with address and contact information.';
-  COMMENT ON COLUMN Person.BusinessEntity.BusinessEntityID IS 'Primary key for all customers, vendors, and employees.';
+comment on table person.business_entity is 'source of the id that connects vendors, customers, and employees with address and contact information.';
+  comment on column person.business_entity.business_entity_id is 'primary key for all customers, vendors, and employees.';
 
-COMMENT ON TABLE Person.BusinessEntityAddress IS 'Cross-reference table mapping customers, vendors, and employees to their addresses.';
-  COMMENT ON COLUMN Person.BusinessEntityAddress.BusinessEntityID IS 'Primary key. Foreign key to BusinessEntity.BusinessEntityID.';
-  COMMENT ON COLUMN Person.BusinessEntityAddress.AddressID IS 'Primary key. Foreign key to Address.AddressID.';
-  COMMENT ON COLUMN Person.BusinessEntityAddress.AddressTypeID IS 'Primary key. Foreign key to AddressType.AddressTypeID.';
+comment on table person.business_entity_address is 'cross-reference table mapping customers, vendors, and employees to their addresses.';
+  comment on column person.business_entity_address.business_entity_id is 'primary key. foreign key to business_entity.business_entity_id.';
+  comment on column person.business_entity_address.address_id is 'primary key. foreign key to address.address_id.';
+  comment on column person.business_entity_address.address_type_id is 'primary key. foreign key to address_type.address_type_id.';
 
-COMMENT ON TABLE Person.BusinessEntityContact IS 'Cross-reference table mapping stores, vendors, and employees to people';
-  COMMENT ON COLUMN Person.BusinessEntityContact.BusinessEntityID IS 'Primary key. Foreign key to BusinessEntity.BusinessEntityID.';
-  COMMENT ON COLUMN Person.BusinessEntityContact.PersonID IS 'Primary key. Foreign key to Person.BusinessEntityID.';
-  COMMENT ON COLUMN Person.BusinessEntityContact.ContactTypeID IS 'Primary key.  Foreign key to ContactType.ContactTypeID.';
+comment on table person.business_entity_contact is 'cross-reference table mapping stores, vendors, and employees to people';
+  comment on column person.business_entity_contact.business_entity_id is 'primary key. foreign key to business_entity.business_entity_id.';
+  comment on column person.business_entity_contact.person_id is 'primary key. foreign key to person.business_entity_id.';
+  comment on column person.business_entity_contact.contact_type_id is 'primary key.  foreign key to contact_type.contact_type_id.';
 
-COMMENT ON TABLE Person.ContactType IS 'Lookup table containing the types of business entity contacts.';
-  COMMENT ON COLUMN Person.ContactType.ContactTypeID IS 'Primary key for ContactType records.';
-  COMMENT ON COLUMN Person.ContactType.Name IS 'Contact type description.';
+comment on table person.contact_type is 'lookup table containing the types of business entity contacts.';
+  comment on column person.contact_type.contact_type_id is 'primary key for contact_type records.';
+  comment on column person.contact_type.name is 'contact type description.';
 
-COMMENT ON TABLE Sales.CountryRegionCurrency IS 'Cross-reference table mapping ISO currency codes to a country or region.';
-  COMMENT ON COLUMN Sales.CountryRegionCurrency.CountryRegionCode IS 'ISO code for countries and regions. Foreign key to CountryRegion.CountryRegionCode.';
-  COMMENT ON COLUMN Sales.CountryRegionCurrency.CurrencyCode IS 'ISO standard currency code. Foreign key to Currency.CurrencyCode.';
+comment on table sales.country_region_currency is 'cross-reference table mapping iso currency codes to a country or region.';
+  comment on column sales.country_region_currency.country_region_code is 'iso code for countries and regions. foreign key to country_region.country_region_code.';
+  comment on column sales.country_region_currency.currency_code is 'iso standard currency code. foreign key to currency.currency_code.';
 
-COMMENT ON TABLE Person.CountryRegion IS 'Lookup table containing the ISO standard codes for countries and regions.';
-  COMMENT ON COLUMN Person.CountryRegion.CountryRegionCode IS 'ISO standard code for countries and regions.';
-  COMMENT ON COLUMN Person.CountryRegion.Name IS 'Country or region name.';
+comment on table person.country_region is 'lookup table containing the iso standard codes for countries and regions.';
+  comment on column person.country_region.country_region_code is 'iso standard code for countries and regions.';
+  comment on column person.country_region.name is 'country or region name.';
 
-COMMENT ON TABLE Sales.CreditCard IS 'Customer credit card information.';
-  COMMENT ON COLUMN Sales.CreditCard.CreditCardID IS 'Primary key for CreditCard records.';
-  COMMENT ON COLUMN Sales.CreditCard.CardType IS 'Credit card name.';
-  COMMENT ON COLUMN Sales.CreditCard.CardNumber IS 'Credit card number.';
-  COMMENT ON COLUMN Sales.CreditCard.ExpMonth IS 'Credit card expiration month.';
-  COMMENT ON COLUMN Sales.CreditCard.ExpYear IS 'Credit card expiration year.';
+comment on table sales.credit_card is 'customer credit card information.';
+  comment on column sales.credit_card.credit_card_id is 'primary key for credit_card records.';
+  comment on column sales.credit_card.card_type is 'credit card name.';
+  comment on column sales.credit_card.card_number is 'credit card number.';
+  comment on column sales.credit_card.exp_month is 'credit card expiration month.';
+  comment on column sales.credit_card.exp_year is 'credit card expiration year.';
 
-COMMENT ON TABLE Production.Culture IS 'Lookup table containing the languages in which some AdventureWorks data is stored.';
-  COMMENT ON COLUMN Production.Culture.CultureID IS 'Primary key for Culture records.';
-  COMMENT ON COLUMN Production.Culture.Name IS 'Culture description.';
+comment on table production.culture is 'lookup table containing the languages in which some adventure_works data is stored.';
+  comment on column production.culture.culture_id is 'primary key for culture records.';
+  comment on column production.culture.name is 'culture description.';
 
-COMMENT ON TABLE Sales.Currency IS 'Lookup table containing standard ISO currencies.';
-  COMMENT ON COLUMN Sales.Currency.CurrencyCode IS 'The ISO code for the Currency.';
-  COMMENT ON COLUMN Sales.Currency.Name IS 'Currency name.';
+comment on table sales.currency is 'lookup table containing standard iso currencies.';
+  comment on column sales.currency.currency_code is 'the iso code for the currency.';
+  comment on column sales.currency.name is 'currency name.';
 
-COMMENT ON TABLE Sales.CurrencyRate IS 'Currency exchange rates.';
-  COMMENT ON COLUMN Sales.CurrencyRate.CurrencyRateID IS 'Primary key for CurrencyRate records.';
-  COMMENT ON COLUMN Sales.CurrencyRate.CurrencyRateDate IS 'Date and time the exchange rate was obtained.';
-  COMMENT ON COLUMN Sales.CurrencyRate.FromCurrencyCode IS 'Exchange rate was converted from this currency code.';
-  COMMENT ON COLUMN Sales.CurrencyRate.ToCurrencyCode IS 'Exchange rate was converted to this currency code.';
-  COMMENT ON COLUMN Sales.CurrencyRate.AverageRate IS 'Average exchange rate for the day.';
-  COMMENT ON COLUMN Sales.CurrencyRate.EndOfDayRate IS 'Final exchange rate for the day.';
+comment on table sales.currency_rate is 'currency exchange rates.';
+  comment on column sales.currency_rate.currency_rate_id is 'primary key for currency_rate records.';
+  comment on column sales.currency_rate.currency_rate_date is 'date and time the exchange rate was obtained.';
+  comment on column sales.currency_rate.from_currency_code is 'exchange rate was converted from this currency code.';
+  comment on column sales.currency_rate.to_currency_code is 'exchange rate was converted to this currency code.';
+  comment on column sales.currency_rate.average_rate is 'average exchange rate for the day.';
+  comment on column sales.currency_rate.end_of_day_rate is 'final exchange rate for the day.';
 
-COMMENT ON TABLE Sales.Customer IS 'Current customer information. Also see the Person and Store tables.';
-  COMMENT ON COLUMN Sales.Customer.CustomerID IS 'Primary key.';
-  COMMENT ON COLUMN Sales.Customer.PersonID IS 'Foreign key to Person.BusinessEntityID';
-  COMMENT ON COLUMN Sales.Customer.StoreID IS 'Foreign key to Store.BusinessEntityID';
-  COMMENT ON COLUMN Sales.Customer.TerritoryID IS 'ID of the territory in which the customer is located. Foreign key to SalesTerritory.SalesTerritoryID.';
+comment on table sales.customer is 'current customer information. also see the person and store tables.';
+  comment on column sales.customer.customer_id is 'primary key.';
+  comment on column sales.customer.person_id is 'foreign key to person.business_entity_id';
+  comment on column sales.customer.store_id is 'foreign key to store.business_entity_id';
+  comment on column sales.customer.territory_id is 'id of the territory in which the customer is located. foreign key to sales_territory.sales_territory_id.';
 --  COMMENT ON COLUMN Sales.Customer.AccountNumber IS 'Unique number identifying the customer assigned by the accounting system.';
 
-COMMENT ON TABLE HumanResources.Department IS 'Lookup table containing the departments within the Adventure Works Cycles company.';
-  COMMENT ON COLUMN HumanResources.Department.DepartmentID IS 'Primary key for Department records.';
-  COMMENT ON COLUMN HumanResources.Department.Name IS 'Name of the department.';
-  COMMENT ON COLUMN HumanResources.Department.GroupName IS 'Name of the group to which the department belongs.';
+comment on table human_resources.department is 'lookup table containing the departments within the adventure works cycles company.';
+  comment on column human_resources.department.department_id is 'primary key for department records.';
+  comment on column human_resources.department.name is 'name of the department.';
+  comment on column human_resources.department.group_name is 'name of the group to which the department belongs.';
 
-COMMENT ON TABLE Production.Document IS 'Product maintenance documents.';
-  COMMENT ON COLUMN Production.Document.DocumentNode IS 'Primary key for Document records.';
+comment on table production.document is 'product maintenance documents.';
+  comment on column production.document.document_node is 'primary key for document records.';
 --  COMMENT ON COLUMN Production.Document.DocumentLevel IS 'Depth in the document hierarchy.';
-  COMMENT ON COLUMN Production.Document.Title IS 'Title of the document.';
-  COMMENT ON COLUMN Production.Document.Owner IS 'Employee who controls the document.  Foreign key to Employee.BusinessEntityID';
-  COMMENT ON COLUMN Production.Document.FolderFlag IS '0 = This is a folder, 1 = This is a document.';
-  COMMENT ON COLUMN Production.Document.FileName IS 'File name of the document';
-  COMMENT ON COLUMN Production.Document.FileExtension IS 'File extension indicating the document type. For example, .doc or .txt.';
-  COMMENT ON COLUMN Production.Document.Revision IS 'Revision number of the document.';
-  COMMENT ON COLUMN Production.Document.ChangeNumber IS 'Engineering change approval number.';
-  COMMENT ON COLUMN Production.Document.Status IS '1 = Pending approval, 2 = Approved, 3 = Obsolete';
-  COMMENT ON COLUMN Production.Document.DocumentSummary IS 'Document abstract.';
-  COMMENT ON COLUMN Production.Document.Document IS 'Complete document.';
-  COMMENT ON COLUMN Production.Document.rowguid IS 'ROWGUIDCOL number uniquely identifying the record. Required for FileStream.';
+  comment on column production.document.title is 'title of the document.';
+  comment on column production.document.owner is 'employee who controls the document.  foreign key to employee.business_entity_id';
+  comment on column production.document.folder_flag is '0 = this is a folder, 1 = this is a document.';
+  comment on column production.document.file_name is 'file name of the document';
+  comment on column production.document.file_extension is 'file extension indicating the document type. for example, .doc or .txt.';
+  comment on column production.document.revision is 'revision number of the document.';
+  comment on column production.document.change_number is 'engineering change approval number.';
+  comment on column production.document.status is '1 = pending approval, 2 = approved, 3 = obsolete';
+  comment on column production.document.document_summary is 'document abstract.';
+  comment on column production.document.document is 'complete document.';
+  comment on column production.document.rowguid is 'rowguidcol number uniquely identifying the record. required for file_stream.';
 
-COMMENT ON TABLE Person.EmailAddress IS 'Where to send a person email.';
-  COMMENT ON COLUMN Person.EmailAddress.BusinessEntityID IS 'Primary key. Person associated with this email address.  Foreign key to Person.BusinessEntityID';
-  COMMENT ON COLUMN Person.EmailAddress.EmailAddressID IS 'Primary key. ID of this email address.';
-  COMMENT ON COLUMN Person.EmailAddress.EmailAddress IS 'E-mail address for the person.';
+comment on table person.email_address is 'where to send a person email.';
+  comment on column person.email_address.business_entity_id is 'primary key. person associated with this email address.  foreign key to person.business_entity_id';
+  comment on column person.email_address.email_address_id is 'primary key. id of this email address.';
+  comment on column person.email_address.email_address is 'e-mail address for the person.';
 
-COMMENT ON TABLE HumanResources.Employee IS 'Employee information such as salary, department, and title.';
-  COMMENT ON COLUMN HumanResources.Employee.BusinessEntityID IS 'Primary key for Employee records.  Foreign key to BusinessEntity.BusinessEntityID.';
-  COMMENT ON COLUMN HumanResources.Employee.NationalIDNumber IS 'Unique national identification number such as a social security number.';
-  COMMENT ON COLUMN HumanResources.Employee.LoginID IS 'Network login.';
-  COMMENT ON COLUMN HumanResources.Employee.OrganizationNode IS 'Where the employee is located in corporate hierarchy.';
+comment on table human_resources.employee is 'employee information such as salary, department, and title.';
+  comment on column human_resources.employee.business_entity_id is 'primary key for employee records.  foreign key to business_entity.business_entity_id.';
+  comment on column human_resources.employee.national_id_number is 'unique national identification number such as a social security number.';
+  comment on column human_resources.employee.login_id is 'network login.';
+  comment on column human_resources.employee.organization_node is 'where the employee is located in corporate hierarchy.';
 --  COMMENT ON COLUMN HumanResources.Employee.OrganizationLevel IS 'The depth of the employee in the corporate hierarchy.';
-  COMMENT ON COLUMN HumanResources.Employee.JobTitle IS 'Work title such as Buyer or Sales Representative.';
-  COMMENT ON COLUMN HumanResources.Employee.BirthDate IS 'Date of birth.';
-  COMMENT ON COLUMN HumanResources.Employee.MaritalStatus IS 'M = Married, S = Single';
-  COMMENT ON COLUMN HumanResources.Employee.Gender IS 'M = Male, F = Female';
-  COMMENT ON COLUMN HumanResources.Employee.HireDate IS 'Employee hired on this date.';
-  COMMENT ON COLUMN HumanResources.Employee.SalariedFlag IS 'Job classification. 0 = Hourly, not exempt from collective bargaining. 1 = Salaried, exempt from collective bargaining.';
-  COMMENT ON COLUMN HumanResources.Employee.VacationHours IS 'Number of available vacation hours.';
-  COMMENT ON COLUMN HumanResources.Employee.SickLeaveHours IS 'Number of available sick leave hours.';
-  COMMENT ON COLUMN HumanResources.Employee.CurrentFlag IS '0 = Inactive, 1 = Active';
+  comment on column human_resources.employee.job_title is 'work title such as buyer or sales representative.';
+  comment on column human_resources.employee.birth_date is 'date of birth.';
+  comment on column human_resources.employee.marital_status is 'm = married, s = single';
+  comment on column human_resources.employee.gender is 'm = male, f = female';
+  comment on column human_resources.employee.hire_date is 'employee hired on this date.';
+  comment on column human_resources.employee.salaried_flag is 'job classification. 0 = hourly, not exempt from collective bargaining. 1 = salaried, exempt from collective bargaining.';
+  comment on column human_resources.employee.vacation_hours is 'number of available vacation hours.';
+  comment on column human_resources.employee.sick_leave_hours is 'number of available sick leave hours.';
+  comment on column human_resources.employee.current_flag is '0 = inactive, 1 = active';
 
-COMMENT ON TABLE HumanResources.EmployeeDepartmentHistory IS 'Employee department transfers.';
-  COMMENT ON COLUMN HumanResources.EmployeeDepartmentHistory.BusinessEntityID IS 'Employee identification number. Foreign key to Employee.BusinessEntityID.';
-  COMMENT ON COLUMN HumanResources.EmployeeDepartmentHistory.DepartmentID IS 'Department in which the employee worked including currently. Foreign key to Department.DepartmentID.';
-  COMMENT ON COLUMN HumanResources.EmployeeDepartmentHistory.ShiftID IS 'Identifies which 8-hour shift the employee works. Foreign key to Shift.Shift.ID.';
-  COMMENT ON COLUMN HumanResources.EmployeeDepartmentHistory.StartDate IS 'Date the employee started work in the department.';
-  COMMENT ON COLUMN HumanResources.EmployeeDepartmentHistory.EndDate IS 'Date the employee left the department. NULL = Current department.';
+comment on table human_resources.employee_department_history is 'employee department transfers.';
+  comment on column human_resources.employee_department_history.business_entity_id is 'employee identification number. foreign key to employee.business_entity_id.';
+  comment on column human_resources.employee_department_history.department_id is 'department in which the employee worked including currently. foreign key to department.department_id.';
+  comment on column human_resources.employee_department_history.shift_id is 'identifies which 8-hour shift the employee works. foreign key to shift.shift.id.';
+  comment on column human_resources.employee_department_history.start_date is 'date the employee started work in the department.';
+  comment on column human_resources.employee_department_history.end_date is 'date the employee left the department. null = current department.';
 
-COMMENT ON TABLE HumanResources.EmployeePayHistory IS 'Employee pay history.';
-  COMMENT ON COLUMN HumanResources.EmployeePayHistory.BusinessEntityID IS 'Employee identification number. Foreign key to Employee.BusinessEntityID.';
-  COMMENT ON COLUMN HumanResources.EmployeePayHistory.RateChangeDate IS 'Date the change in pay is effective';
-  COMMENT ON COLUMN HumanResources.EmployeePayHistory.Rate IS 'Salary hourly rate.';
-  COMMENT ON COLUMN HumanResources.EmployeePayHistory.PayFrequency IS '1 = Salary received monthly, 2 = Salary received biweekly';
+comment on table human_resources.employee_pay_history is 'employee pay history.';
+  comment on column human_resources.employee_pay_history.business_entity_id is 'employee identification number. foreign key to employee.business_entity_id.';
+  comment on column human_resources.employee_pay_history.rate_change_date is 'date the change in pay is effective';
+  comment on column human_resources.employee_pay_history.rate is 'salary hourly rate.';
+  comment on column human_resources.employee_pay_history.pay_frequency is '1 = salary received monthly, 2 = salary received biweekly';
 
-COMMENT ON TABLE Production.Illustration IS 'Bicycle assembly diagrams.';
-  COMMENT ON COLUMN Production.Illustration.IllustrationID IS 'Primary key for Illustration records.';
-  COMMENT ON COLUMN Production.Illustration.Diagram IS 'Illustrations used in manufacturing instructions. Stored as XML.';
+comment on table production.illustration is 'bicycle assembly diagrams.';
+  comment on column production.illustration.illustration_id is 'primary key for illustration records.';
+  comment on column production.illustration.diagram is 'illustrations used in manufacturing instructions. stored as xml.';
 
-COMMENT ON TABLE HumanResources.JobCandidate IS 'Résumés submitted to Human Resources by job applicants.';
-  COMMENT ON COLUMN HumanResources.JobCandidate.JobCandidateID IS 'Primary key for JobCandidate records.';
-  COMMENT ON COLUMN HumanResources.JobCandidate.BusinessEntityID IS 'Employee identification number if applicant was hired. Foreign key to Employee.BusinessEntityID.';
-  COMMENT ON COLUMN HumanResources.JobCandidate.Resume IS 'Résumé in XML format.';
+comment on table human_resources.job_candidate is 'résumés submitted to human resources by job applicants.';
+  comment on column human_resources.job_candidate.job_candidate_id is 'primary key for job_candidate records.';
+  comment on column human_resources.job_candidate.business_entity_id is 'employee identification number if applicant was hired. foreign key to employee.business_entity_id.';
+  comment on column human_resources.job_candidate.resume is 'résumé in xml format.';
 
-COMMENT ON TABLE Production.Location IS 'Product inventory and manufacturing locations.';
-  COMMENT ON COLUMN Production.Location.LocationID IS 'Primary key for Location records.';
-  COMMENT ON COLUMN Production.Location.Name IS 'Location description.';
-  COMMENT ON COLUMN Production.Location.CostRate IS 'Standard hourly cost of the manufacturing location.';
-  COMMENT ON COLUMN Production.Location.Availability IS 'Work capacity (in hours) of the manufacturing location.';
+comment on table production.location is 'product inventory and manufacturing locations.';
+  comment on column production.location.location_id is 'primary key for location records.';
+  comment on column production.location.name is 'location description.';
+  comment on column production.location.cost_rate is 'standard hourly cost of the manufacturing location.';
+  comment on column production.location.availability is 'work capacity (in hours) of the manufacturing location.';
 
-COMMENT ON TABLE Person.Password IS 'One way hashed authentication information';
-  COMMENT ON COLUMN Person.Password.PasswordHash IS 'Password for the e-mail account.';
-  COMMENT ON COLUMN Person.Password.PasswordSalt IS 'Random value concatenated with the password string before the password is hashed.';
+comment on table person.password is 'one way hashed authentication information';
+  comment on column person.password.password_hash is 'password for the e-mail account.';
+  comment on column person.password.password_salt is 'random value concatenated with the password string before the password is hashed.';
 
-COMMENT ON TABLE Person.Person IS 'Human beings involved with AdventureWorks: employees, customer contacts, and vendor contacts.';
-  COMMENT ON COLUMN Person.Person.BusinessEntityID IS 'Primary key for Person records.';
-  COMMENT ON COLUMN Person.Person.PersonType IS 'Primary type of person: SC = Store Contact, IN = Individual (retail) customer, SP = Sales person, EM = Employee (non-sales), VC = Vendor contact, GC = General contact';
-  COMMENT ON COLUMN Person.Person.NameStyle IS '0 = The data in FirstName and LastName are stored in western style (first name, last name) order.  1 = Eastern style (last name, first name) order.';
-  COMMENT ON COLUMN Person.Person.Title IS 'A courtesy title. For example, Mr. or Ms.';
-  COMMENT ON COLUMN Person.Person.FirstName IS 'First name of the person.';
-  COMMENT ON COLUMN Person.Person.MiddleName IS 'Middle name or middle initial of the person.';
-  COMMENT ON COLUMN Person.Person.LastName IS 'Last name of the person.';
-  COMMENT ON COLUMN Person.Person.Suffix IS 'Surname suffix. For example, Sr. or Jr.';
-  COMMENT ON COLUMN Person.Person.EmailPromotion IS '0 = Contact does not wish to receive e-mail promotions, 1 = Contact does wish to receive e-mail promotions from AdventureWorks, 2 = Contact does wish to receive e-mail promotions from AdventureWorks and selected partners.';
-  COMMENT ON COLUMN Person.Person.Demographics IS 'Personal information such as hobbies, and income collected from online shoppers. Used for sales analysis.';
-  COMMENT ON COLUMN Person.Person.AdditionalContactInfo IS 'Additional contact information about the person stored in xml format.';
+comment on table person.person is 'human beings involved with adventure_works: employees, customer contacts, and vendor contacts.';
+  comment on column person.person.business_entity_id is 'primary key for person records.';
+  comment on column person.person.person_type is 'primary type of person: sc = store contact, in = individual (retail) customer, sp = sales person, em = employee (non-sales), vc = vendor contact, gc = general contact';
+  comment on column person.person.name_style is '0 = the data in first_name and last_name are stored in western style (first name, last name) order.  1 = eastern style (last name, first name) order.';
+  comment on column person.person.title is 'a courtesy title. for example, mr. or ms.';
+  comment on column person.person.first_name is 'first name of the person.';
+  comment on column person.person.middle_name is 'middle name or middle initial of the person.';
+  comment on column person.person.last_name is 'last name of the person.';
+  comment on column person.person.suffix is 'surname suffix. for example, sr. or jr.';
+  comment on column person.person.email_promotion is '0 = contact does not wish to receive e-mail promotions, 1 = contact does wish to receive e-mail promotions from adventure_works, 2 = contact does wish to receive e-mail promotions from adventure_works and selected partners.';
+  comment on column person.person.demographics is 'personal information such as hobbies, and income collected from online shoppers. used for sales analysis.';
+  comment on column person.person.additional_contact_info is 'additional contact information about the person stored in xml format.';
 
-COMMENT ON TABLE Sales.PersonCreditCard IS 'Cross-reference table mapping people to their credit card information in the CreditCard table.';
-  COMMENT ON COLUMN Sales.PersonCreditCard.BusinessEntityID IS 'Business entity identification number. Foreign key to Person.BusinessEntityID.';
-  COMMENT ON COLUMN Sales.PersonCreditCard.CreditCardID IS 'Credit card identification number. Foreign key to CreditCard.CreditCardID.';
+comment on table sales.person_credit_card is 'cross-reference table mapping people to their credit card information in the credit_card table.';
+  comment on column sales.person_credit_card.business_entity_id is 'business entity identification number. foreign key to person.business_entity_id.';
+  comment on column sales.person_credit_card.credit_card_id is 'credit card identification number. foreign key to credit_card.credit_card_id.';
 
-COMMENT ON TABLE Person.PersonPhone IS 'Telephone number and type of a person.';
-  COMMENT ON COLUMN Person.PersonPhone.BusinessEntityID IS 'Business entity identification number. Foreign key to Person.BusinessEntityID.';
-  COMMENT ON COLUMN Person.PersonPhone.PhoneNumber IS 'Telephone number identification number.';
-  COMMENT ON COLUMN Person.PersonPhone.PhoneNumberTypeID IS 'Kind of phone number. Foreign key to PhoneNumberType.PhoneNumberTypeID.';
+comment on table person.person_phone is 'telephone number and type of a person.';
+  comment on column person.person_phone.business_entity_id is 'business entity identification number. foreign key to person.business_entity_id.';
+  comment on column person.person_phone.phone_number is 'telephone number identification number.';
+  comment on column person.person_phone.phone_number_type_id is 'kind of phone number. foreign key to phone_number_type.phone_number_type_id.';
 
-COMMENT ON TABLE Person.PhoneNumberType IS 'Type of phone number of a person.';
-  COMMENT ON COLUMN Person.PhoneNumberType.PhoneNumberTypeID IS 'Primary key for telephone number type records.';
-  COMMENT ON COLUMN Person.PhoneNumberType.Name IS 'Name of the telephone number type';
+comment on table person.phone_number_type is 'type of phone number of a person.';
+  comment on column person.phone_number_type.phone_number_type_id is 'primary key for telephone number type records.';
+  comment on column person.phone_number_type.name is 'name of the telephone number type';
 
-COMMENT ON TABLE Production.Product IS 'Products sold or used in the manfacturing of sold products.';
-  COMMENT ON COLUMN Production.Product.ProductID IS 'Primary key for Product records.';
-  COMMENT ON COLUMN Production.Product.Name IS 'Name of the product.';
-  COMMENT ON COLUMN Production.Product.ProductNumber IS 'Unique product identification number.';
-  COMMENT ON COLUMN Production.Product.MakeFlag IS '0 = Product is purchased, 1 = Product is manufactured in-house.';
-  COMMENT ON COLUMN Production.Product.FinishedGoodsFlag IS '0 = Product is not a salable item. 1 = Product is salable.';
-  COMMENT ON COLUMN Production.Product.Color IS 'Product color.';
-  COMMENT ON COLUMN Production.Product.SafetyStockLevel IS 'Minimum inventory quantity.';
-  COMMENT ON COLUMN Production.Product.ReorderPoint IS 'Inventory level that triggers a purchase order or work order.';
-  COMMENT ON COLUMN Production.Product.StandardCost IS 'Standard cost of the product.';
-  COMMENT ON COLUMN Production.Product.ListPrice IS 'Selling price.';
-  COMMENT ON COLUMN Production.Product.Size IS 'Product size.';
-  COMMENT ON COLUMN Production.Product.SizeUnitMeasureCode IS 'Unit of measure for Size column.';
-  COMMENT ON COLUMN Production.Product.WeightUnitMeasureCode IS 'Unit of measure for Weight column.';
-  COMMENT ON COLUMN Production.Product.Weight IS 'Product weight.';
-  COMMENT ON COLUMN Production.Product.DaysToManufacture IS 'Number of days required to manufacture the product.';
-  COMMENT ON COLUMN Production.Product.ProductLine IS 'R = Road, M = Mountain, T = Touring, S = Standard';
-  COMMENT ON COLUMN Production.Product.Class IS 'H = High, M = Medium, L = Low';
-  COMMENT ON COLUMN Production.Product.Style IS 'W = Womens, M = Mens, U = Universal';
-  COMMENT ON COLUMN Production.Product.ProductSubcategoryID IS 'Product is a member of this product subcategory. Foreign key to ProductSubCategory.ProductSubCategoryID.';
-  COMMENT ON COLUMN Production.Product.ProductModelID IS 'Product is a member of this product model. Foreign key to ProductModel.ProductModelID.';
-  COMMENT ON COLUMN Production.Product.SellStartDate IS 'Date the product was available for sale.';
-  COMMENT ON COLUMN Production.Product.SellEndDate IS 'Date the product was no longer available for sale.';
-  COMMENT ON COLUMN Production.Product.DiscontinuedDate IS 'Date the product was discontinued.';
+comment on table production.product is 'products sold or used in the manfacturing of sold products.';
+  comment on column production.product.product_id is 'primary key for product records.';
+  comment on column production.product.name is 'name of the product.';
+  comment on column production.product.product_number is 'unique product identification number.';
+  comment on column production.product.make_flag is '0 = product is purchased, 1 = product is manufactured in-house.';
+  comment on column production.product.finished_goods_flag is '0 = product is not a salable item. 1 = product is salable.';
+  comment on column production.product.color is 'product color.';
+  comment on column production.product.safety_stock_level is 'minimum inventory quantity.';
+  comment on column production.product.reorder_point is 'inventory level that triggers a purchase order or work order.';
+  comment on column production.product.standard_cost is 'standard cost of the product.';
+  comment on column production.product.list_price is 'selling price.';
+  comment on column production.product.size is 'product size.';
+  comment on column production.product.size_unit_measure_code is 'unit of measure for size column.';
+  comment on column production.product.weight_unit_measure_code is 'unit of measure for weight column.';
+  comment on column production.product.weight is 'product weight.';
+  comment on column production.product.days_to_manufacture is 'number of days required to manufacture the product.';
+  comment on column production.product.product_line is 'r = road, m = mountain, t = touring, s = standard';
+  comment on column production.product.class is 'h = high, m = medium, l = low';
+  comment on column production.product.style is 'w = womens, m = mens, u = universal';
+  comment on column production.product.product_subcategory_id is 'product is a member of this product subcategory. foreign key to product_sub_category.product_sub_category_id.';
+  comment on column production.product.product_model_id is 'product is a member of this product model. foreign key to product_model.product_model_id.';
+  comment on column production.product.sell_start_date is 'date the product was available for sale.';
+  comment on column production.product.sell_end_date is 'date the product was no longer available for sale.';
+  comment on column production.product.discontinued_date is 'date the product was discontinued.';
 
-COMMENT ON TABLE Production.ProductCategory IS 'High-level product categorization.';
-  COMMENT ON COLUMN Production.ProductCategory.ProductCategoryID IS 'Primary key for ProductCategory records.';
-  COMMENT ON COLUMN Production.ProductCategory.Name IS 'Category description.';
+comment on table production.product_category is 'high-level product categorization.';
+  comment on column production.product_category.product_category_id is 'primary key for product_category records.';
+  comment on column production.product_category.name is 'category description.';
 
-COMMENT ON TABLE Production.ProductCostHistory IS 'Changes in the cost of a product over time.';
-  COMMENT ON COLUMN Production.ProductCostHistory.ProductID IS 'Product identification number. Foreign key to Product.ProductID';
-  COMMENT ON COLUMN Production.ProductCostHistory.StartDate IS 'Product cost start date.';
-  COMMENT ON COLUMN Production.ProductCostHistory.EndDate IS 'Product cost end date.';
-  COMMENT ON COLUMN Production.ProductCostHistory.StandardCost IS 'Standard cost of the product.';
+comment on table production.product_cost_history is 'changes in the cost of a product over time.';
+  comment on column production.product_cost_history.product_id is 'product identification number. foreign key to product.product_id';
+  comment on column production.product_cost_history.start_date is 'product cost start date.';
+  comment on column production.product_cost_history.end_date is 'product cost end date.';
+  comment on column production.product_cost_history.standard_cost is 'standard cost of the product.';
 
-COMMENT ON TABLE Production.ProductDescription IS 'Product descriptions in several languages.';
-  COMMENT ON COLUMN Production.ProductDescription.ProductDescriptionID IS 'Primary key for ProductDescription records.';
-  COMMENT ON COLUMN Production.ProductDescription.Description IS 'Description of the product.';
+comment on table production.product_description is 'product descriptions in several languages.';
+  comment on column production.product_description.product_description_id is 'primary key for product_description records.';
+  comment on column production.product_description.description is 'description of the product.';
 
-COMMENT ON TABLE Production.ProductDocument IS 'Cross-reference table mapping products to related product documents.';
-  COMMENT ON COLUMN Production.ProductDocument.ProductID IS 'Product identification number. Foreign key to Product.ProductID.';
-  COMMENT ON COLUMN Production.ProductDocument.DocumentNode IS 'Document identification number. Foreign key to Document.DocumentNode.';
+comment on table production.product_document is 'cross-reference table mapping products to related product documents.';
+  comment on column production.product_document.product_id is 'product identification number. foreign key to product.product_id.';
+  comment on column production.product_document.document_node is 'document identification number. foreign key to document.document_node.';
 
-COMMENT ON TABLE Production.ProductInventory IS 'Product inventory information.';
-  COMMENT ON COLUMN Production.ProductInventory.ProductID IS 'Product identification number. Foreign key to Product.ProductID.';
-  COMMENT ON COLUMN Production.ProductInventory.LocationID IS 'Inventory location identification number. Foreign key to Location.LocationID.';
-  COMMENT ON COLUMN Production.ProductInventory.Shelf IS 'Storage compartment within an inventory location.';
-  COMMENT ON COLUMN Production.ProductInventory.Bin IS 'Storage container on a shelf in an inventory location.';
-  COMMENT ON COLUMN Production.ProductInventory.Quantity IS 'Quantity of products in the inventory location.';
+comment on table production.product_inventory is 'product inventory information.';
+  comment on column production.product_inventory.product_id is 'product identification number. foreign key to product.product_id.';
+  comment on column production.product_inventory.location_id is 'inventory location identification number. foreign key to location.location_id.';
+  comment on column production.product_inventory.shelf is 'storage compartment within an inventory location.';
+  comment on column production.product_inventory.bin is 'storage container on a shelf in an inventory location.';
+  comment on column production.product_inventory.quantity is 'quantity of products in the inventory location.';
 
-COMMENT ON TABLE Production.ProductListPriceHistory IS 'Changes in the list price of a product over time.';
-  COMMENT ON COLUMN Production.ProductListPriceHistory.ProductID IS 'Product identification number. Foreign key to Product.ProductID';
-  COMMENT ON COLUMN Production.ProductListPriceHistory.StartDate IS 'List price start date.';
-  COMMENT ON COLUMN Production.ProductListPriceHistory.EndDate IS 'List price end date';
-  COMMENT ON COLUMN Production.ProductListPriceHistory.ListPrice IS 'Product list price.';
+comment on table production.product_list_price_history is 'changes in the list price of a product over time.';
+  comment on column production.product_list_price_history.product_id is 'product identification number. foreign key to product.product_id';
+  comment on column production.product_list_price_history.start_date is 'list price start date.';
+  comment on column production.product_list_price_history.end_date is 'list price end date';
+  comment on column production.product_list_price_history.list_price is 'product list price.';
 
-COMMENT ON TABLE Production.ProductModel IS 'Product model classification.';
-  COMMENT ON COLUMN Production.ProductModel.ProductModelID IS 'Primary key for ProductModel records.';
-  COMMENT ON COLUMN Production.ProductModel.Name IS 'Product model description.';
-  COMMENT ON COLUMN Production.ProductModel.CatalogDescription IS 'Detailed product catalog information in xml format.';
-  COMMENT ON COLUMN Production.ProductModel.Instructions IS 'Manufacturing instructions in xml format.';
+comment on table production.product_model is 'product model classification.';
+  comment on column production.product_model.product_model_id is 'primary key for product_model records.';
+  comment on column production.product_model.name is 'product model description.';
+  comment on column production.product_model.catalog_description is 'detailed product catalog information in xml format.';
+  comment on column production.product_model.instructions is 'manufacturing instructions in xml format.';
 
-COMMENT ON TABLE Production.ProductModelIllustration IS 'Cross-reference table mapping product models and illustrations.';
-  COMMENT ON COLUMN Production.ProductModelIllustration.ProductModelID IS 'Primary key. Foreign key to ProductModel.ProductModelID.';
-  COMMENT ON COLUMN Production.ProductModelIllustration.IllustrationID IS 'Primary key. Foreign key to Illustration.IllustrationID.';
+comment on table production.product_model_illustration is 'cross-reference table mapping product models and illustrations.';
+  comment on column production.product_model_illustration.product_model_id is 'primary key. foreign key to product_model.product_model_id.';
+  comment on column production.product_model_illustration.illustration_id is 'primary key. foreign key to illustration.illustration_id.';
 
-COMMENT ON TABLE Production.ProductModelProductDescriptionCulture IS 'Cross-reference table mapping product descriptions and the language the description is written in.';
-  COMMENT ON COLUMN Production.ProductModelProductDescriptionCulture.ProductModelID IS 'Primary key. Foreign key to ProductModel.ProductModelID.';
-  COMMENT ON COLUMN Production.ProductModelProductDescriptionCulture.ProductDescriptionID IS 'Primary key. Foreign key to ProductDescription.ProductDescriptionID.';
-  COMMENT ON COLUMN Production.ProductModelProductDescriptionCulture.CultureID IS 'Culture identification number. Foreign key to Culture.CultureID.';
+comment on table production.product_model_product_description_culture is 'cross-reference table mapping product descriptions and the language the description is written in.';
+  comment on column production.product_model_product_description_culture.product_model_id is 'primary key. foreign key to product_model.product_model_id.';
+  comment on column production.product_model_product_description_culture.product_description_id is 'primary key. foreign key to product_description.product_description_id.';
+  comment on column production.product_model_product_description_culture.culture_id is 'culture identification number. foreign key to culture.culture_id.';
 
-COMMENT ON TABLE Production.ProductPhoto IS 'Product images.';
-  COMMENT ON COLUMN Production.ProductPhoto.ProductPhotoID IS 'Primary key for ProductPhoto records.';
-  COMMENT ON COLUMN Production.ProductPhoto.ThumbNailPhoto IS 'Small image of the product.';
-  COMMENT ON COLUMN Production.ProductPhoto.ThumbnailPhotoFileName IS 'Small image file name.';
-  COMMENT ON COLUMN Production.ProductPhoto.LargePhoto IS 'Large image of the product.';
-  COMMENT ON COLUMN Production.ProductPhoto.LargePhotoFileName IS 'Large image file name.';
+comment on table production.product_photo is 'product images.';
+  comment on column production.product_photo.product_photo_id is 'primary key for product_photo records.';
+  comment on column production.product_photo.thumb_nail_photo is 'small image of the product.';
+  comment on column production.product_photo.thumbnail_photo_file_name is 'small image file name.';
+  comment on column production.product_photo.large_photo is 'large image of the product.';
+  comment on column production.product_photo.large_photo_file_name is 'large image file name.';
 
-COMMENT ON TABLE Production.ProductProductPhoto IS 'Cross-reference table mapping products and product photos.';
-  COMMENT ON COLUMN Production.ProductProductPhoto.ProductID IS 'Product identification number. Foreign key to Product.ProductID.';
-  COMMENT ON COLUMN Production.ProductProductPhoto.ProductPhotoID IS 'Product photo identification number. Foreign key to ProductPhoto.ProductPhotoID.';
-  COMMENT ON COLUMN Production.ProductProductPhoto.Primary IS '0 = Photo is not the principal image. 1 = Photo is the principal image.';
+comment on table production.product_product_photo is 'cross-reference table mapping products and product photos.';
+  comment on column production.product_product_photo.product_id is 'product identification number. foreign key to product.product_id.';
+  comment on column production.product_product_photo.product_photo_id is 'product photo identification number. foreign key to product_photo.product_photo_id.';
+  comment on column production.product_product_photo.primary is '0 = photo is not the principal image. 1 = photo is the principal image.';
 
-COMMENT ON TABLE Production.ProductReview IS 'Customer reviews of products they have purchased.';
-  COMMENT ON COLUMN Production.ProductReview.ProductReviewID IS 'Primary key for ProductReview records.';
-  COMMENT ON COLUMN Production.ProductReview.ProductID IS 'Product identification number. Foreign key to Product.ProductID.';
-  COMMENT ON COLUMN Production.ProductReview.ReviewerName IS 'Name of the reviewer.';
-  COMMENT ON COLUMN Production.ProductReview.ReviewDate IS 'Date review was submitted.';
-  COMMENT ON COLUMN Production.ProductReview.EmailAddress IS 'Reviewer''s e-mail address.';
-  COMMENT ON COLUMN Production.ProductReview.Rating IS 'Product rating given by the reviewer. Scale is 1 to 5 with 5 as the highest rating.';
-  COMMENT ON COLUMN Production.ProductReview.Comments IS 'Reviewer''s comments';
+comment on table production.product_review is 'customer reviews of products they have purchased.';
+  comment on column production.product_review.product_review_id is 'primary key for product_review records.';
+  comment on column production.product_review.product_id is 'product identification number. foreign key to product.product_id.';
+  comment on column production.product_review.reviewer_name is 'name of the reviewer.';
+  comment on column production.product_review.review_date is 'date review was submitted.';
+  comment on column production.product_review.email_address is 'reviewer''s e-mail address.';
+  comment on column production.product_review.rating is 'product rating given by the reviewer. scale is 1 to 5 with 5 as the highest rating.';
+  comment on column production.product_review.comments is 'reviewer''s comments';
 
-COMMENT ON TABLE Production.ProductSubcategory IS 'Product subcategories. See ProductCategory table.';
-  COMMENT ON COLUMN Production.ProductSubcategory.ProductSubcategoryID IS 'Primary key for ProductSubcategory records.';
-  COMMENT ON COLUMN Production.ProductSubcategory.ProductCategoryID IS 'Product category identification number. Foreign key to ProductCategory.ProductCategoryID.';
-  COMMENT ON COLUMN Production.ProductSubcategory.Name IS 'Subcategory description.';
+comment on table production.product_subcategory is 'product subcategories. see product_category table.';
+  comment on column production.product_subcategory.product_subcategory_id is 'primary key for product_subcategory records.';
+  comment on column production.product_subcategory.product_category_id is 'product category identification number. foreign key to product_category.product_category_id.';
+  comment on column production.product_subcategory.name is 'subcategory description.';
 
-COMMENT ON TABLE Purchasing.ProductVendor IS 'Cross-reference table mapping vendors with the products they supply.';
-  COMMENT ON COLUMN Purchasing.ProductVendor.ProductID IS 'Primary key. Foreign key to Product.ProductID.';
-  COMMENT ON COLUMN Purchasing.ProductVendor.BusinessEntityID IS 'Primary key. Foreign key to Vendor.BusinessEntityID.';
-  COMMENT ON COLUMN Purchasing.ProductVendor.AverageLeadTime IS 'The average span of time (in days) between placing an order with the vendor and receiving the purchased product.';
-  COMMENT ON COLUMN Purchasing.ProductVendor.StandardPrice IS 'The vendor''s usual selling price.';
-  COMMENT ON COLUMN Purchasing.ProductVendor.LastReceiptCost IS 'The selling price when last purchased.';
-  COMMENT ON COLUMN Purchasing.ProductVendor.LastReceiptDate IS 'Date the product was last received by the vendor.';
-  COMMENT ON COLUMN Purchasing.ProductVendor.MinOrderQty IS 'The maximum quantity that should be ordered.';
-  COMMENT ON COLUMN Purchasing.ProductVendor.MaxOrderQty IS 'The minimum quantity that should be ordered.';
-  COMMENT ON COLUMN Purchasing.ProductVendor.OnOrderQty IS 'The quantity currently on order.';
-  COMMENT ON COLUMN Purchasing.ProductVendor.UnitMeasureCode IS 'The product''s unit of measure.';
+comment on table purchasing.product_vendor is 'cross-reference table mapping vendors with the products they supply.';
+  comment on column purchasing.product_vendor.product_id is 'primary key. foreign key to product.product_id.';
+  comment on column purchasing.product_vendor.business_entity_id is 'primary key. foreign key to vendor.business_entity_id.';
+  comment on column purchasing.product_vendor.average_lead_time is 'the average span of time (in days) between placing an order with the vendor and receiving the purchased product.';
+  comment on column purchasing.product_vendor.standard_price is 'the vendor''s usual selling price.';
+  comment on column purchasing.product_vendor.last_receipt_cost is 'the selling price when last purchased.';
+  comment on column purchasing.product_vendor.last_receipt_date is 'date the product was last received by the vendor.';
+  comment on column purchasing.product_vendor.min_order_qty is 'the maximum quantity that should be ordered.';
+  comment on column purchasing.product_vendor.max_order_qty is 'the minimum quantity that should be ordered.';
+  comment on column purchasing.product_vendor.on_order_qty is 'the quantity currently on order.';
+  comment on column purchasing.product_vendor.unit_measure_code is 'the product''s unit of measure.';
 
-COMMENT ON TABLE Purchasing.PurchaseOrderDetail IS 'Individual products associated with a specific purchase order. See PurchaseOrderHeader.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderDetail.PurchaseOrderID IS 'Primary key. Foreign key to PurchaseOrderHeader.PurchaseOrderID.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderDetail.PurchaseOrderDetailID IS 'Primary key. One line number per purchased product.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderDetail.DueDate IS 'Date the product is expected to be received.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderDetail.OrderQty IS 'Quantity ordered.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderDetail.ProductID IS 'Product identification number. Foreign key to Product.ProductID.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderDetail.UnitPrice IS 'Vendor''s selling price of a single product.';
+comment on table purchasing.purchase_order_detail is 'individual products associated with a specific purchase order. see purchase_order_header.';
+  comment on column purchasing.purchase_order_detail.purchase_order_id is 'primary key. foreign key to purchase_order_header.purchase_order_id.';
+  comment on column purchasing.purchase_order_detail.purchase_order_detail_id is 'primary key. one line number per purchased product.';
+  comment on column purchasing.purchase_order_detail.due_date is 'date the product is expected to be received.';
+  comment on column purchasing.purchase_order_detail.order_qty is 'quantity ordered.';
+  comment on column purchasing.purchase_order_detail.product_id is 'product identification number. foreign key to product.product_id.';
+  comment on column purchasing.purchase_order_detail.unit_price is 'vendor''s selling price of a single product.';
 --  COMMENT ON COLUMN Purchasing.PurchaseOrderDetail.LineTotal IS 'Per product subtotal. Computed as OrderQty * UnitPrice.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderDetail.ReceivedQty IS 'Quantity actually received from the vendor.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderDetail.RejectedQty IS 'Quantity rejected during inspection.';
+  comment on column purchasing.purchase_order_detail.received_qty is 'quantity actually received from the vendor.';
+  comment on column purchasing.purchase_order_detail.rejected_qty is 'quantity rejected during inspection.';
 --  COMMENT ON COLUMN Purchasing.PurchaseOrderDetail.StockedQty IS 'Quantity accepted into inventory. Computed as ReceivedQty - RejectedQty.';
 
-COMMENT ON TABLE Purchasing.PurchaseOrderHeader IS 'General purchase order information. See PurchaseOrderDetail.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderHeader.PurchaseOrderID IS 'Primary key.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderHeader.RevisionNumber IS 'Incremental number to track changes to the purchase order over time.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderHeader.Status IS 'Order current status. 1 = Pending; 2 = Approved; 3 = Rejected; 4 = Complete';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderHeader.EmployeeID IS 'Employee who created the purchase order. Foreign key to Employee.BusinessEntityID.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderHeader.VendorID IS 'Vendor with whom the purchase order is placed. Foreign key to Vendor.BusinessEntityID.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderHeader.ShipMethodID IS 'Shipping method. Foreign key to ShipMethod.ShipMethodID.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderHeader.OrderDate IS 'Purchase order creation date.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderHeader.ShipDate IS 'Estimated shipment date from the vendor.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderHeader.SubTotal IS 'Purchase order subtotal. Computed as SUM(PurchaseOrderDetail.LineTotal)for the appropriate PurchaseOrderID.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderHeader.TaxAmt IS 'Tax amount.';
-  COMMENT ON COLUMN Purchasing.PurchaseOrderHeader.Freight IS 'Shipping cost.';
+comment on table purchasing.purchase_order_header is 'general purchase order information. see purchase_order_detail.';
+  comment on column purchasing.purchase_order_header.purchase_order_id is 'primary key.';
+  comment on column purchasing.purchase_order_header.revision_number is 'incremental number to track changes to the purchase order over time.';
+  comment on column purchasing.purchase_order_header.status is 'order current status. 1 = pending; 2 = approved; 3 = rejected; 4 = complete';
+  comment on column purchasing.purchase_order_header.employee_id is 'employee who created the purchase order. foreign key to employee.business_entity_id.';
+  comment on column purchasing.purchase_order_header.vendor_id is 'vendor with whom the purchase order is placed. foreign key to vendor.business_entity_id.';
+  comment on column purchasing.purchase_order_header.ship_method_id is 'shipping method. foreign key to ship_method.ship_method_id.';
+  comment on column purchasing.purchase_order_header.order_date is 'purchase order creation date.';
+  comment on column purchasing.purchase_order_header.ship_date is 'estimated shipment date from the vendor.';
+  comment on column purchasing.purchase_order_header.sub_total is 'purchase order subtotal. computed as sum(purchase_order_detail.line_total)for the appropriate purchase_order_id.';
+  comment on column purchasing.purchase_order_header.tax_amt is 'tax amount.';
+  comment on column purchasing.purchase_order_header.freight is 'shipping cost.';
 --  COMMENT ON COLUMN Purchasing.PurchaseOrderHeader.TotalDue IS 'Total due to vendor. Computed as Subtotal + TaxAmt + Freight.';
 
-COMMENT ON TABLE Sales.SalesOrderDetail IS 'Individual products associated with a specific sales order. See SalesOrderHeader.';
-  COMMENT ON COLUMN Sales.SalesOrderDetail.SalesOrderID IS 'Primary key. Foreign key to SalesOrderHeader.SalesOrderID.';
-  COMMENT ON COLUMN Sales.SalesOrderDetail.SalesOrderDetailID IS 'Primary key. One incremental unique number per product sold.';
-  COMMENT ON COLUMN Sales.SalesOrderDetail.CarrierTrackingNumber IS 'Shipment tracking number supplied by the shipper.';
-  COMMENT ON COLUMN Sales.SalesOrderDetail.OrderQty IS 'Quantity ordered per product.';
-  COMMENT ON COLUMN Sales.SalesOrderDetail.ProductID IS 'Product sold to customer. Foreign key to Product.ProductID.';
-  COMMENT ON COLUMN Sales.SalesOrderDetail.SpecialOfferID IS 'Promotional code. Foreign key to SpecialOffer.SpecialOfferID.';
-  COMMENT ON COLUMN Sales.SalesOrderDetail.UnitPrice IS 'Selling price of a single product.';
-  COMMENT ON COLUMN Sales.SalesOrderDetail.UnitPriceDiscount IS 'Discount amount.';
+comment on table sales.sales_order_detail is 'individual products associated with a specific sales order. see sales_order_header.';
+  comment on column sales.sales_order_detail.sales_order_id is 'primary key. foreign key to sales_order_header.sales_order_id.';
+  comment on column sales.sales_order_detail.sales_order_detail_id is 'primary key. one incremental unique number per product sold.';
+  comment on column sales.sales_order_detail.carrier_tracking_number is 'shipment tracking number supplied by the shipper.';
+  comment on column sales.sales_order_detail.order_qty is 'quantity ordered per product.';
+  comment on column sales.sales_order_detail.product_id is 'product sold to customer. foreign key to product.product_id.';
+  comment on column sales.sales_order_detail.special_offer_id is 'promotional code. foreign key to special_offer.special_offer_id.';
+  comment on column sales.sales_order_detail.unit_price is 'selling price of a single product.';
+  comment on column sales.sales_order_detail.unit_price_discount is 'discount amount.';
 --  COMMENT ON COLUMN Sales.SalesOrderDetail.LineTotal IS 'Per product subtotal. Computed as UnitPrice * (1 - UnitPriceDiscount) * OrderQty.';
 
-COMMENT ON TABLE Sales.SalesOrderHeader IS 'General sales order information.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.SalesOrderID IS 'Primary key.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.RevisionNumber IS 'Incremental number to track changes to the sales order over time.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.OrderDate IS 'Dates the sales order was created.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.DueDate IS 'Date the order is due to the customer.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.ShipDate IS 'Date the order was shipped to the customer.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.Status IS 'Order current status. 1 = In process; 2 = Approved; 3 = Backordered; 4 = Rejected; 5 = Shipped; 6 = Cancelled';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.OnlineOrderFlag IS '0 = Order placed by sales person. 1 = Order placed online by customer.';
+comment on table sales.sales_order_header is 'general sales order information.';
+  comment on column sales.sales_order_header.sales_order_id is 'primary key.';
+  comment on column sales.sales_order_header.revision_number is 'incremental number to track changes to the sales order over time.';
+  comment on column sales.sales_order_header.order_date is 'dates the sales order was created.';
+  comment on column sales.sales_order_header.due_date is 'date the order is due to the customer.';
+  comment on column sales.sales_order_header.ship_date is 'date the order was shipped to the customer.';
+  comment on column sales.sales_order_header.status is 'order current status. 1 = in process; 2 = approved; 3 = backordered; 4 = rejected; 5 = shipped; 6 = cancelled';
+  comment on column sales.sales_order_header.online_order_flag is '0 = order placed by sales person. 1 = order placed online by customer.';
 --  COMMENT ON COLUMN Sales.SalesOrderHeader.SalesOrderNumber IS 'Unique sales order identification number.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.PurchaseOrderNumber IS 'Customer purchase order number reference.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.AccountNumber IS 'Financial accounting number reference.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.CustomerID IS 'Customer identification number. Foreign key to Customer.BusinessEntityID.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.SalesPersonID IS 'Sales person who created the sales order. Foreign key to SalesPerson.BusinessEntityID.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.TerritoryID IS 'Territory in which the sale was made. Foreign key to SalesTerritory.SalesTerritoryID.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.BillToAddressID IS 'Customer billing address. Foreign key to Address.AddressID.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.ShipToAddressID IS 'Customer shipping address. Foreign key to Address.AddressID.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.ShipMethodID IS 'Shipping method. Foreign key to ShipMethod.ShipMethodID.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.CreditCardID IS 'Credit card identification number. Foreign key to CreditCard.CreditCardID.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.CreditCardApprovalCode IS 'Approval code provided by the credit card company.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.CurrencyRateID IS 'Currency exchange rate used. Foreign key to CurrencyRate.CurrencyRateID.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.SubTotal IS 'Sales subtotal. Computed as SUM(SalesOrderDetail.LineTotal)for the appropriate SalesOrderID.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.TaxAmt IS 'Tax amount.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.Freight IS 'Shipping cost.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.TotalDue IS 'Total due from customer. Computed as Subtotal + TaxAmt + Freight.';
-  COMMENT ON COLUMN Sales.SalesOrderHeader.Comment IS 'Sales representative comments.';
+  comment on column sales.sales_order_header.purchase_order_number is 'customer purchase order number reference.';
+  comment on column sales.sales_order_header.account_number is 'financial accounting number reference.';
+  comment on column sales.sales_order_header.customer_id is 'customer identification number. foreign key to customer.business_entity_id.';
+  comment on column sales.sales_order_header.sales_person_id is 'sales person who created the sales order. foreign key to sales_person.business_entity_id.';
+  comment on column sales.sales_order_header.territory_id is 'territory in which the sale was made. foreign key to sales_territory.sales_territory_id.';
+  comment on column sales.sales_order_header.bill_to_address_id is 'customer billing address. foreign key to address.address_id.';
+  comment on column sales.sales_order_header.ship_to_address_id is 'customer shipping address. foreign key to address.address_id.';
+  comment on column sales.sales_order_header.ship_method_id is 'shipping method. foreign key to ship_method.ship_method_id.';
+  comment on column sales.sales_order_header.credit_card_id is 'credit card identification number. foreign key to credit_card.credit_card_id.';
+  comment on column sales.sales_order_header.credit_card_approval_code is 'approval code provided by the credit card company.';
+  comment on column sales.sales_order_header.currency_rate_id is 'currency exchange rate used. foreign key to currency_rate.currency_rate_id.';
+  comment on column sales.sales_order_header.sub_total is 'sales subtotal. computed as sum(sales_order_detail.line_total)for the appropriate sales_order_id.';
+  comment on column sales.sales_order_header.tax_amt is 'tax amount.';
+  comment on column sales.sales_order_header.freight is 'shipping cost.';
+  comment on column sales.sales_order_header.total_due is 'total due from customer. computed as subtotal + tax_amt + freight.';
+  comment on column sales.sales_order_header.comment is 'sales representative comments.';
 
-COMMENT ON TABLE Sales.SalesOrderHeaderSalesReason IS 'Cross-reference table mapping sales orders to sales reason codes.';
-  COMMENT ON COLUMN Sales.SalesOrderHeaderSalesReason.SalesOrderID IS 'Primary key. Foreign key to SalesOrderHeader.SalesOrderID.';
-  COMMENT ON COLUMN Sales.SalesOrderHeaderSalesReason.SalesReasonID IS 'Primary key. Foreign key to SalesReason.SalesReasonID.';
+comment on table sales.sales_order_header_sales_reason is 'cross-reference table mapping sales orders to sales reason codes.';
+  comment on column sales.sales_order_header_sales_reason.sales_order_id is 'primary key. foreign key to sales_order_header.sales_order_id.';
+  comment on column sales.sales_order_header_sales_reason.sales_reason_id is 'primary key. foreign key to sales_reason.sales_reason_id.';
 
-COMMENT ON TABLE Sales.SalesPerson IS 'Sales representative current information.';
-  COMMENT ON COLUMN Sales.SalesPerson.BusinessEntityID IS 'Primary key for SalesPerson records. Foreign key to Employee.BusinessEntityID';
-  COMMENT ON COLUMN Sales.SalesPerson.TerritoryID IS 'Territory currently assigned to. Foreign key to SalesTerritory.SalesTerritoryID.';
-  COMMENT ON COLUMN Sales.SalesPerson.SalesQuota IS 'Projected yearly sales.';
-  COMMENT ON COLUMN Sales.SalesPerson.Bonus IS 'Bonus due if quota is met.';
-  COMMENT ON COLUMN Sales.SalesPerson.CommissionPct IS 'Commision percent received per sale.';
-  COMMENT ON COLUMN Sales.SalesPerson.SalesYTD IS 'Sales total year to date.';
-  COMMENT ON COLUMN Sales.SalesPerson.SalesLastYear IS 'Sales total of previous year.';
+comment on table sales.sales_person is 'sales representative current information.';
+  comment on column sales.sales_person.business_entity_id is 'primary key for sales_person records. foreign key to employee.business_entity_id';
+  comment on column sales.sales_person.territory_id is 'territory currently assigned to. foreign key to sales_territory.sales_territory_id.';
+  comment on column sales.sales_person.sales_quota is 'projected yearly sales.';
+  comment on column sales.sales_person.bonus is 'bonus due if quota is met.';
+  comment on column sales.sales_person.commission_pct is 'commision percent received per sale.';
+  comment on column sales.sales_person.sales_ytd is 'sales total year to date.';
+  comment on column sales.sales_person.sales_last_year is 'sales total of previous year.';
 
-COMMENT ON TABLE Sales.SalesPersonQuotaHistory IS 'Sales performance tracking.';
-  COMMENT ON COLUMN Sales.SalesPersonQuotaHistory.BusinessEntityID IS 'Sales person identification number. Foreign key to SalesPerson.BusinessEntityID.';
-  COMMENT ON COLUMN Sales.SalesPersonQuotaHistory.QuotaDate IS 'Sales quota date.';
-  COMMENT ON COLUMN Sales.SalesPersonQuotaHistory.SalesQuota IS 'Sales quota amount.';
+comment on table sales.sales_person_quota_history is 'sales performance tracking.';
+  comment on column sales.sales_person_quota_history.business_entity_id is 'sales person identification number. foreign key to sales_person.business_entity_id.';
+  comment on column sales.sales_person_quota_history.quota_date is 'sales quota date.';
+  comment on column sales.sales_person_quota_history.sales_quota is 'sales quota amount.';
 
-COMMENT ON TABLE Sales.SalesReason IS 'Lookup table of customer purchase reasons.';
-  COMMENT ON COLUMN Sales.SalesReason.SalesReasonID IS 'Primary key for SalesReason records.';
-  COMMENT ON COLUMN Sales.SalesReason.Name IS 'Sales reason description.';
-  COMMENT ON COLUMN Sales.SalesReason.ReasonType IS 'Category the sales reason belongs to.';
+comment on table sales.sales_reason is 'lookup table of customer purchase reasons.';
+  comment on column sales.sales_reason.sales_reason_id is 'primary key for sales_reason records.';
+  comment on column sales.sales_reason.name is 'sales reason description.';
+  comment on column sales.sales_reason.reason_type is 'category the sales reason belongs to.';
 
-COMMENT ON TABLE Sales.SalesTaxRate IS 'Tax rate lookup table.';
-  COMMENT ON COLUMN Sales.SalesTaxRate.SalesTaxRateID IS 'Primary key for SalesTaxRate records.';
-  COMMENT ON COLUMN Sales.SalesTaxRate.StateProvinceID IS 'State, province, or country/region the sales tax applies to.';
-  COMMENT ON COLUMN Sales.SalesTaxRate.TaxType IS '1 = Tax applied to retail transactions, 2 = Tax applied to wholesale transactions, 3 = Tax applied to all sales (retail and wholesale) transactions.';
-  COMMENT ON COLUMN Sales.SalesTaxRate.TaxRate IS 'Tax rate amount.';
-  COMMENT ON COLUMN Sales.SalesTaxRate.Name IS 'Tax rate description.';
+comment on table sales.sales_tax_rate is 'tax rate lookup table.';
+  comment on column sales.sales_tax_rate.sales_tax_rate_id is 'primary key for sales_tax_rate records.';
+  comment on column sales.sales_tax_rate.state_province_id is 'state, province, or country/region the sales tax applies to.';
+  comment on column sales.sales_tax_rate.tax_type is '1 = tax applied to retail transactions, 2 = tax applied to wholesale transactions, 3 = tax applied to all sales (retail and wholesale) transactions.';
+  comment on column sales.sales_tax_rate.tax_rate is 'tax rate amount.';
+  comment on column sales.sales_tax_rate.name is 'tax rate description.';
 
-COMMENT ON TABLE Sales.SalesTerritory IS 'Sales territory lookup table.';
-  COMMENT ON COLUMN Sales.SalesTerritory.TerritoryID IS 'Primary key for SalesTerritory records.';
-  COMMENT ON COLUMN Sales.SalesTerritory.Name IS 'Sales territory description';
-  COMMENT ON COLUMN Sales.SalesTerritory.CountryRegionCode IS 'ISO standard country or region code. Foreign key to CountryRegion.CountryRegionCode.';
-  COMMENT ON COLUMN Sales.SalesTerritory.Group IS 'Geographic area to which the sales territory belong.';
-  COMMENT ON COLUMN Sales.SalesTerritory.SalesYTD IS 'Sales in the territory year to date.';
-  COMMENT ON COLUMN Sales.SalesTerritory.SalesLastYear IS 'Sales in the territory the previous year.';
-  COMMENT ON COLUMN Sales.SalesTerritory.CostYTD IS 'Business costs in the territory year to date.';
-  COMMENT ON COLUMN Sales.SalesTerritory.CostLastYear IS 'Business costs in the territory the previous year.';
+comment on table sales.sales_territory is 'sales territory lookup table.';
+  comment on column sales.sales_territory.territory_id is 'primary key for sales_territory records.';
+  comment on column sales.sales_territory.name is 'sales territory description';
+  comment on column sales.sales_territory.country_region_code is 'iso standard country or region code. foreign key to country_region.country_region_code.';
+  comment on column sales.sales_territory.group is 'geographic area to which the sales territory belong.';
+  comment on column sales.sales_territory.sales_ytd is 'sales in the territory year to date.';
+  comment on column sales.sales_territory.sales_last_year is 'sales in the territory the previous year.';
+  comment on column sales.sales_territory.cost_ytd is 'business costs in the territory year to date.';
+  comment on column sales.sales_territory.cost_last_year is 'business costs in the territory the previous year.';
 
-COMMENT ON TABLE Sales.SalesTerritoryHistory IS 'Sales representative transfers to other sales territories.';
-  COMMENT ON COLUMN Sales.SalesTerritoryHistory.BusinessEntityID IS 'Primary key. The sales rep.  Foreign key to SalesPerson.BusinessEntityID.';
-  COMMENT ON COLUMN Sales.SalesTerritoryHistory.TerritoryID IS 'Primary key. Territory identification number. Foreign key to SalesTerritory.SalesTerritoryID.';
-  COMMENT ON COLUMN Sales.SalesTerritoryHistory.StartDate IS 'Primary key. Date the sales representive started work in the territory.';
-  COMMENT ON COLUMN Sales.SalesTerritoryHistory.EndDate IS 'Date the sales representative left work in the territory.';
+comment on table sales.sales_territory_history is 'sales representative transfers to other sales territories.';
+  comment on column sales.sales_territory_history.business_entity_id is 'primary key. the sales rep.  foreign key to sales_person.business_entity_id.';
+  comment on column sales.sales_territory_history.territory_id is 'primary key. territory identification number. foreign key to sales_territory.sales_territory_id.';
+  comment on column sales.sales_territory_history.start_date is 'primary key. date the sales representive started work in the territory.';
+  comment on column sales.sales_territory_history.end_date is 'date the sales representative left work in the territory.';
 
-COMMENT ON TABLE Production.ScrapReason IS 'Manufacturing failure reasons lookup table.';
-  COMMENT ON COLUMN Production.ScrapReason.ScrapReasonID IS 'Primary key for ScrapReason records.';
-  COMMENT ON COLUMN Production.ScrapReason.Name IS 'Failure description.';
+comment on table production.scrap_reason is 'manufacturing failure reasons lookup table.';
+  comment on column production.scrap_reason.scrap_reason_id is 'primary key for scrap_reason records.';
+  comment on column production.scrap_reason.name is 'failure description.';
 
-COMMENT ON TABLE HumanResources.Shift IS 'Work shift lookup table.';
-  COMMENT ON COLUMN HumanResources.Shift.ShiftID IS 'Primary key for Shift records.';
-  COMMENT ON COLUMN HumanResources.Shift.Name IS 'Shift description.';
-  COMMENT ON COLUMN HumanResources.Shift.StartTime IS 'Shift start time.';
-  COMMENT ON COLUMN HumanResources.Shift.EndTime IS 'Shift end time.';
+comment on table human_resources.shift is 'work shift lookup table.';
+  comment on column human_resources.shift.shift_id is 'primary key for shift records.';
+  comment on column human_resources.shift.name is 'shift description.';
+  comment on column human_resources.shift.start_time is 'shift start time.';
+  comment on column human_resources.shift.end_time is 'shift end time.';
 
-COMMENT ON TABLE Purchasing.ShipMethod IS 'Shipping company lookup table.';
-  COMMENT ON COLUMN Purchasing.ShipMethod.ShipMethodID IS 'Primary key for ShipMethod records.';
-  COMMENT ON COLUMN Purchasing.ShipMethod.Name IS 'Shipping company name.';
-  COMMENT ON COLUMN Purchasing.ShipMethod.ShipBase IS 'Minimum shipping charge.';
-  COMMENT ON COLUMN Purchasing.ShipMethod.ShipRate IS 'Shipping charge per pound.';
+comment on table purchasing.ship_method is 'shipping company lookup table.';
+  comment on column purchasing.ship_method.ship_method_id is 'primary key for ship_method records.';
+  comment on column purchasing.ship_method.name is 'shipping company name.';
+  comment on column purchasing.ship_method.ship_base is 'minimum shipping charge.';
+  comment on column purchasing.ship_method.ship_rate is 'shipping charge per pound.';
 
-COMMENT ON TABLE Sales.ShoppingCartItem IS 'Contains online customer orders until the order is submitted or cancelled.';
-  COMMENT ON COLUMN Sales.ShoppingCartItem.ShoppingCartItemID IS 'Primary key for ShoppingCartItem records.';
-  COMMENT ON COLUMN Sales.ShoppingCartItem.ShoppingCartID IS 'Shopping cart identification number.';
-  COMMENT ON COLUMN Sales.ShoppingCartItem.Quantity IS 'Product quantity ordered.';
-  COMMENT ON COLUMN Sales.ShoppingCartItem.ProductID IS 'Product ordered. Foreign key to Product.ProductID.';
-  COMMENT ON COLUMN Sales.ShoppingCartItem.DateCreated IS 'Date the time the record was created.';
+comment on table sales.shopping_cart_item is 'contains online customer orders until the order is submitted or cancelled.';
+  comment on column sales.shopping_cart_item.shopping_cart_item_id is 'primary key for shopping_cart_item records.';
+  comment on column sales.shopping_cart_item.shopping_cart_id is 'shopping cart identification number.';
+  comment on column sales.shopping_cart_item.quantity is 'product quantity ordered.';
+  comment on column sales.shopping_cart_item.product_id is 'product ordered. foreign key to product.product_id.';
+  comment on column sales.shopping_cart_item.date_created is 'date the time the record was created.';
 
-COMMENT ON TABLE Sales.SpecialOffer IS 'Sale discounts lookup table.';
-  COMMENT ON COLUMN Sales.SpecialOffer.SpecialOfferID IS 'Primary key for SpecialOffer records.';
-  COMMENT ON COLUMN Sales.SpecialOffer.Description IS 'Discount description.';
-  COMMENT ON COLUMN Sales.SpecialOffer.DiscountPct IS 'Discount precentage.';
-  COMMENT ON COLUMN Sales.SpecialOffer.Type IS 'Discount type category.';
-  COMMENT ON COLUMN Sales.SpecialOffer.Category IS 'Group the discount applies to such as Reseller or Customer.';
-  COMMENT ON COLUMN Sales.SpecialOffer.StartDate IS 'Discount start date.';
-  COMMENT ON COLUMN Sales.SpecialOffer.EndDate IS 'Discount end date.';
-  COMMENT ON COLUMN Sales.SpecialOffer.MinQty IS 'Minimum discount percent allowed.';
-  COMMENT ON COLUMN Sales.SpecialOffer.MaxQty IS 'Maximum discount percent allowed.';
+comment on table sales.special_offer is 'sale discounts lookup table.';
+  comment on column sales.special_offer.special_offer_id is 'primary key for special_offer records.';
+  comment on column sales.special_offer.description is 'discount description.';
+  comment on column sales.special_offer.discount_pct is 'discount precentage.';
+  comment on column sales.special_offer.type is 'discount type category.';
+  comment on column sales.special_offer.category is 'group the discount applies to such as reseller or customer.';
+  comment on column sales.special_offer.start_date is 'discount start date.';
+  comment on column sales.special_offer.end_date is 'discount end date.';
+  comment on column sales.special_offer.min_qty is 'minimum discount percent allowed.';
+  comment on column sales.special_offer.max_qty is 'maximum discount percent allowed.';
 
-COMMENT ON TABLE Sales.SpecialOfferProduct IS 'Cross-reference table mapping products to special offer discounts.';
-  COMMENT ON COLUMN Sales.SpecialOfferProduct.SpecialOfferID IS 'Primary key for SpecialOfferProduct records.';
-  COMMENT ON COLUMN Sales.SpecialOfferProduct.ProductID IS 'Product identification number. Foreign key to Product.ProductID.';
+comment on table sales.special_offer_product is 'cross-reference table mapping products to special offer discounts.';
+  comment on column sales.special_offer_product.special_offer_id is 'primary key for special_offer_product records.';
+  comment on column sales.special_offer_product.product_id is 'product identification number. foreign key to product.product_id.';
 
-COMMENT ON TABLE Person.StateProvince IS 'State and province lookup table.';
-  COMMENT ON COLUMN Person.StateProvince.StateProvinceID IS 'Primary key for StateProvince records.';
-  COMMENT ON COLUMN Person.StateProvince.StateProvinceCode IS 'ISO standard state or province code.';
-  COMMENT ON COLUMN Person.StateProvince.CountryRegionCode IS 'ISO standard country or region code. Foreign key to CountryRegion.CountryRegionCode.';
-  COMMENT ON COLUMN Person.StateProvince.IsOnlyStateProvinceFlag IS '0 = StateProvinceCode exists. 1 = StateProvinceCode unavailable, using CountryRegionCode.';
-  COMMENT ON COLUMN Person.StateProvince.Name IS 'State or province description.';
-  COMMENT ON COLUMN Person.StateProvince.TerritoryID IS 'ID of the territory in which the state or province is located. Foreign key to SalesTerritory.SalesTerritoryID.';
+comment on table person.state_province is 'state and province lookup table.';
+  comment on column person.state_province.state_province_id is 'primary key for state_province records.';
+  comment on column person.state_province.state_province_code is 'iso standard state or province code.';
+  comment on column person.state_province.country_region_code is 'iso standard country or region code. foreign key to country_region.country_region_code.';
+  comment on column person.state_province.is_only_state_province_flag is '0 = state_province_code exists. 1 = state_province_code unavailable, using country_region_code.';
+  comment on column person.state_province.name is 'state or province description.';
+  comment on column person.state_province.territory_id is 'id of the territory in which the state or province is located. foreign key to sales_territory.sales_territory_id.';
 
-COMMENT ON TABLE Sales.Store IS 'Customers (resellers) of Adventure Works products.';
-  COMMENT ON COLUMN Sales.Store.BusinessEntityID IS 'Primary key. Foreign key to Customer.BusinessEntityID.';
-  COMMENT ON COLUMN Sales.Store.Name IS 'Name of the store.';
-  COMMENT ON COLUMN Sales.Store.SalesPersonID IS 'ID of the sales person assigned to the customer. Foreign key to SalesPerson.BusinessEntityID.';
-  COMMENT ON COLUMN Sales.Store.Demographics IS 'Demographic informationg about the store such as the number of employees, annual sales and store type.';
+comment on table sales.store is 'customers (resellers) of adventure works products.';
+  comment on column sales.store.business_entity_id is 'primary key. foreign key to customer.business_entity_id.';
+  comment on column sales.store.name is 'name of the store.';
+  comment on column sales.store.sales_person_id is 'id of the sales person assigned to the customer. foreign key to sales_person.business_entity_id.';
+  comment on column sales.store.demographics is 'demographic informationg about the store such as the number of employees, annual sales and store type.';
 
 
-COMMENT ON TABLE Production.TransactionHistory IS 'Record of each purchase order, sales order, or work order transaction year to date.';
-  COMMENT ON COLUMN Production.TransactionHistory.TransactionID IS 'Primary key for TransactionHistory records.';
-  COMMENT ON COLUMN Production.TransactionHistory.ProductID IS 'Product identification number. Foreign key to Product.ProductID.';
-  COMMENT ON COLUMN Production.TransactionHistory.ReferenceOrderID IS 'Purchase order, sales order, or work order identification number.';
-  COMMENT ON COLUMN Production.TransactionHistory.ReferenceOrderLineID IS 'Line number associated with the purchase order, sales order, or work order.';
-  COMMENT ON COLUMN Production.TransactionHistory.TransactionDate IS 'Date and time of the transaction.';
-  COMMENT ON COLUMN Production.TransactionHistory.TransactionType IS 'W = WorkOrder, S = SalesOrder, P = PurchaseOrder';
-  COMMENT ON COLUMN Production.TransactionHistory.Quantity IS 'Product quantity.';
-  COMMENT ON COLUMN Production.TransactionHistory.ActualCost IS 'Product cost.';
+comment on table production.transaction_history is 'record of each purchase order, sales order, or work order transaction year to date.';
+  comment on column production.transaction_history.transaction_id is 'primary key for transaction_history records.';
+  comment on column production.transaction_history.product_id is 'product identification number. foreign key to product.product_id.';
+  comment on column production.transaction_history.reference_order_id is 'purchase order, sales order, or work order identification number.';
+  comment on column production.transaction_history.reference_order_line_id is 'line number associated with the purchase order, sales order, or work order.';
+  comment on column production.transaction_history.transaction_date is 'date and time of the transaction.';
+  comment on column production.transaction_history.transaction_type is 'w = work_order, s = sales_order, p = purchase_order';
+  comment on column production.transaction_history.quantity is 'product quantity.';
+  comment on column production.transaction_history.actual_cost is 'product cost.';
 
-COMMENT ON TABLE Production.TransactionHistoryArchive IS 'Transactions for previous years.';
-  COMMENT ON COLUMN Production.TransactionHistoryArchive.TransactionID IS 'Primary key for TransactionHistoryArchive records.';
-  COMMENT ON COLUMN Production.TransactionHistoryArchive.ProductID IS 'Product identification number. Foreign key to Product.ProductID.';
-  COMMENT ON COLUMN Production.TransactionHistoryArchive.ReferenceOrderID IS 'Purchase order, sales order, or work order identification number.';
-  COMMENT ON COLUMN Production.TransactionHistoryArchive.ReferenceOrderLineID IS 'Line number associated with the purchase order, sales order, or work order.';
-  COMMENT ON COLUMN Production.TransactionHistoryArchive.TransactionDate IS 'Date and time of the transaction.';
-  COMMENT ON COLUMN Production.TransactionHistoryArchive.TransactionType IS 'W = Work Order, S = Sales Order, P = Purchase Order';
-  COMMENT ON COLUMN Production.TransactionHistoryArchive.Quantity IS 'Product quantity.';
-  COMMENT ON COLUMN Production.TransactionHistoryArchive.ActualCost IS 'Product cost.';
+comment on table production.transaction_history_archive is 'transactions for previous years.';
+  comment on column production.transaction_history_archive.transaction_id is 'primary key for transaction_history_archive records.';
+  comment on column production.transaction_history_archive.product_id is 'product identification number. foreign key to product.product_id.';
+  comment on column production.transaction_history_archive.reference_order_id is 'purchase order, sales order, or work order identification number.';
+  comment on column production.transaction_history_archive.reference_order_line_id is 'line number associated with the purchase order, sales order, or work order.';
+  comment on column production.transaction_history_archive.transaction_date is 'date and time of the transaction.';
+  comment on column production.transaction_history_archive.transaction_type is 'w = work order, s = sales order, p = purchase order';
+  comment on column production.transaction_history_archive.quantity is 'product quantity.';
+  comment on column production.transaction_history_archive.actual_cost is 'product cost.';
 
-COMMENT ON TABLE Production.UnitMeasure IS 'Unit of measure lookup table.';
-  COMMENT ON COLUMN Production.UnitMeasure.UnitMeasureCode IS 'Primary key.';
-  COMMENT ON COLUMN Production.UnitMeasure.Name IS 'Unit of measure description.';
+comment on table production.unit_measure is 'unit of measure lookup table.';
+  comment on column production.unit_measure.unit_measure_code is 'primary key.';
+  comment on column production.unit_measure.name is 'unit of measure description.';
 
-COMMENT ON TABLE Purchasing.Vendor IS 'Companies from whom Adventure Works Cycles purchases parts or other goods.';
-  COMMENT ON COLUMN Purchasing.Vendor.BusinessEntityID IS 'Primary key for Vendor records.  Foreign key to BusinessEntity.BusinessEntityID';
-  COMMENT ON COLUMN Purchasing.Vendor.AccountNumber IS 'Vendor account (identification) number.';
-  COMMENT ON COLUMN Purchasing.Vendor.Name IS 'Company name.';
-  COMMENT ON COLUMN Purchasing.Vendor.CreditRating IS '1 = Superior, 2 = Excellent, 3 = Above average, 4 = Average, 5 = Below average';
-  COMMENT ON COLUMN Purchasing.Vendor.PreferredVendorStatus IS '0 = Do not use if another vendor is available. 1 = Preferred over other vendors supplying the same product.';
-  COMMENT ON COLUMN Purchasing.Vendor.ActiveFlag IS '0 = Vendor no longer used. 1 = Vendor is actively used.';
-  COMMENT ON COLUMN Purchasing.Vendor.PurchasingWebServiceURL IS 'Vendor URL.';
+comment on table purchasing.vendor is 'companies from whom adventure works cycles purchases parts or other goods.';
+  comment on column purchasing.vendor.business_entity_id is 'primary key for vendor records.  foreign key to business_entity.business_entity_id';
+  comment on column purchasing.vendor.account_number is 'vendor account (identification) number.';
+  comment on column purchasing.vendor.name is 'company name.';
+  comment on column purchasing.vendor.credit_rating is '1 = superior, 2 = excellent, 3 = above average, 4 = average, 5 = below average';
+  comment on column purchasing.vendor.preferred_vendor_status is '0 = do not use if another vendor is available. 1 = preferred over other vendors supplying the same product.';
+  comment on column purchasing.vendor.active_flag is '0 = vendor no longer used. 1 = vendor is actively used.';
+  comment on column purchasing.vendor.purchasing_web_service_url is 'vendor url.';
 
-COMMENT ON TABLE Production.WorkOrder IS 'Manufacturing work orders.';
-  COMMENT ON COLUMN Production.WorkOrder.WorkOrderID IS 'Primary key for WorkOrder records.';
-  COMMENT ON COLUMN Production.WorkOrder.ProductID IS 'Product identification number. Foreign key to Product.ProductID.';
-  COMMENT ON COLUMN Production.WorkOrder.OrderQty IS 'Product quantity to build.';
+comment on table production.work_order is 'manufacturing work orders.';
+  comment on column production.work_order.work_order_id is 'primary key for work_order records.';
+  comment on column production.work_order.product_id is 'product identification number. foreign key to product.product_id.';
+  comment on column production.work_order.order_qty is 'product quantity to build.';
 --  COMMENT ON COLUMN Production.WorkOrder.StockedQty IS 'Quantity built and put in inventory.';
-  COMMENT ON COLUMN Production.WorkOrder.ScrappedQty IS 'Quantity that failed inspection.';
-  COMMENT ON COLUMN Production.WorkOrder.StartDate IS 'Work order start date.';
-  COMMENT ON COLUMN Production.WorkOrder.EndDate IS 'Work order end date.';
-  COMMENT ON COLUMN Production.WorkOrder.DueDate IS 'Work order due date.';
-  COMMENT ON COLUMN Production.WorkOrder.ScrapReasonID IS 'Reason for inspection failure.';
+  comment on column production.work_order.scrapped_qty is 'quantity that failed inspection.';
+  comment on column production.work_order.start_date is 'work order start date.';
+  comment on column production.work_order.end_date is 'work order end date.';
+  comment on column production.work_order.due_date is 'work order due date.';
+  comment on column production.work_order.scrap_reason_id is 'reason for inspection failure.';
 
-COMMENT ON TABLE Production.WorkOrderRouting IS 'Work order details.';
-  COMMENT ON COLUMN Production.WorkOrderRouting.WorkOrderID IS 'Primary key. Foreign key to WorkOrder.WorkOrderID.';
-  COMMENT ON COLUMN Production.WorkOrderRouting.ProductID IS 'Primary key. Foreign key to Product.ProductID.';
-  COMMENT ON COLUMN Production.WorkOrderRouting.OperationSequence IS 'Primary key. Indicates the manufacturing process sequence.';
-  COMMENT ON COLUMN Production.WorkOrderRouting.LocationID IS 'Manufacturing location where the part is processed. Foreign key to Location.LocationID.';
-  COMMENT ON COLUMN Production.WorkOrderRouting.ScheduledStartDate IS 'Planned manufacturing start date.';
-  COMMENT ON COLUMN Production.WorkOrderRouting.ScheduledEndDate IS 'Planned manufacturing end date.';
-  COMMENT ON COLUMN Production.WorkOrderRouting.ActualStartDate IS 'Actual start date.';
-  COMMENT ON COLUMN Production.WorkOrderRouting.ActualEndDate IS 'Actual end date.';
-  COMMENT ON COLUMN Production.WorkOrderRouting.ActualResourceHrs IS 'Number of manufacturing hours used.';
-  COMMENT ON COLUMN Production.WorkOrderRouting.PlannedCost IS 'Estimated manufacturing cost.';
-  COMMENT ON COLUMN Production.WorkOrderRouting.ActualCost IS 'Actual manufacturing cost.';
+comment on table production.work_order_routing is 'work order details.';
+  comment on column production.work_order_routing.work_order_id is 'primary key. foreign key to work_order.work_order_id.';
+  comment on column production.work_order_routing.product_id is 'primary key. foreign key to product.product_id.';
+  comment on column production.work_order_routing.operation_sequence is 'primary key. indicates the manufacturing process sequence.';
+  comment on column production.work_order_routing.location_id is 'manufacturing location where the part is processed. foreign key to location.location_id.';
+  comment on column production.work_order_routing.scheduled_start_date is 'planned manufacturing start date.';
+  comment on column production.work_order_routing.scheduled_end_date is 'planned manufacturing end date.';
+  comment on column production.work_order_routing.actual_start_date is 'actual start date.';
+  comment on column production.work_order_routing.actual_end_date is 'actual end date.';
+  comment on column production.work_order_routing.actual_resource_hrs is 'number of manufacturing hours used.';
+  comment on column production.work_order_routing.planned_cost is 'estimated manufacturing cost.';
+  comment on column production.work_order_routing.actual_cost is 'actual manufacturing cost.';
 
 
 
@@ -1792,344 +1791,344 @@ COMMENT ON TABLE Production.WorkOrderRouting IS 'Work order details.';
 --     CONSTRAINT "PK_DatabaseLog_DatabaseLogID" PRIMARY KEY
 --     (DatabaseLogID);
 
-ALTER TABLE Person.Address ADD
-    CONSTRAINT "PK_Address_AddressID" PRIMARY KEY
-    (AddressID);
-CLUSTER Person.Address USING "PK_Address_AddressID";
-
-ALTER TABLE Person.AddressType ADD
-    CONSTRAINT "PK_AddressType_AddressTypeID" PRIMARY KEY
-    (AddressTypeID);
-CLUSTER Person.AddressType USING "PK_AddressType_AddressTypeID";
-
-ALTER TABLE Production.BillOfMaterials ADD
-    CONSTRAINT "PK_BillOfMaterials_BillOfMaterialsID" PRIMARY KEY
-    (BillOfMaterialsID);
-
-ALTER TABLE Person.BusinessEntity ADD
-    CONSTRAINT "PK_BusinessEntity_BusinessEntityID" PRIMARY KEY
-    (BusinessEntityID);
-CLUSTER Person.BusinessEntity USING "PK_BusinessEntity_BusinessEntityID";
-
-ALTER TABLE Person.BusinessEntityAddress ADD
-    CONSTRAINT "PK_BusinessEntityAddress_BusinessEntityID_AddressID_AddressType" PRIMARY KEY
-    (BusinessEntityID, AddressID, AddressTypeID);
-CLUSTER Person.BusinessEntityAddress USING "PK_BusinessEntityAddress_BusinessEntityID_AddressID_AddressType";
-
-ALTER TABLE Person.BusinessEntityContact ADD
-    CONSTRAINT "PK_BusinessEntityContact_BusinessEntityID_PersonID_ContactTypeI" PRIMARY KEY
-    (BusinessEntityID, PersonID, ContactTypeID);
-CLUSTER Person.BusinessEntityContact USING "PK_BusinessEntityContact_BusinessEntityID_PersonID_ContactTypeI";
-
-ALTER TABLE Person.ContactType ADD
-    CONSTRAINT "PK_ContactType_ContactTypeID" PRIMARY KEY
-    (ContactTypeID);
-CLUSTER Person.ContactType USING "PK_ContactType_ContactTypeID";
-
-ALTER TABLE Sales.CountryRegionCurrency ADD
-    CONSTRAINT "PK_CountryRegionCurrency_CountryRegionCode_CurrencyCode" PRIMARY KEY
-    (CountryRegionCode, CurrencyCode);
-CLUSTER Sales.CountryRegionCurrency USING "PK_CountryRegionCurrency_CountryRegionCode_CurrencyCode";
-
-ALTER TABLE Person.CountryRegion ADD
-    CONSTRAINT "PK_CountryRegion_CountryRegionCode" PRIMARY KEY
-    (CountryRegionCode);
-CLUSTER Person.CountryRegion USING "PK_CountryRegion_CountryRegionCode";
-
-ALTER TABLE Sales.CreditCard ADD
-    CONSTRAINT "PK_CreditCard_CreditCardID" PRIMARY KEY
-    (CreditCardID);
-CLUSTER Sales.CreditCard USING "PK_CreditCard_CreditCardID";
-
-ALTER TABLE Sales.Currency ADD
-    CONSTRAINT "PK_Currency_CurrencyCode" PRIMARY KEY
-    (CurrencyCode);
-CLUSTER Sales.Currency USING "PK_Currency_CurrencyCode";
-
-ALTER TABLE Sales.CurrencyRate ADD
-    CONSTRAINT "PK_CurrencyRate_CurrencyRateID" PRIMARY KEY
-    (CurrencyRateID);
-CLUSTER Sales.CurrencyRate USING "PK_CurrencyRate_CurrencyRateID";
-
-ALTER TABLE Sales.Customer ADD
-    CONSTRAINT "PK_Customer_CustomerID" PRIMARY KEY
-    (CustomerID);
-CLUSTER Sales.Customer USING "PK_Customer_CustomerID";
-
-ALTER TABLE Production.Culture ADD
-    CONSTRAINT "PK_Culture_CultureID" PRIMARY KEY
-    (CultureID);
-CLUSTER Production.Culture USING "PK_Culture_CultureID";
-
-ALTER TABLE Production.Document ADD
-    CONSTRAINT "PK_Document_DocumentNode" PRIMARY KEY
-    (DocumentNode);
-CLUSTER Production.Document USING "PK_Document_DocumentNode";
-
-ALTER TABLE Person.EmailAddress ADD
-    CONSTRAINT "PK_EmailAddress_BusinessEntityID_EmailAddressID" PRIMARY KEY
-    (BusinessEntityID, EmailAddressID);
-CLUSTER Person.EmailAddress USING "PK_EmailAddress_BusinessEntityID_EmailAddressID";
-
-ALTER TABLE HumanResources.Department ADD
-    CONSTRAINT "PK_Department_DepartmentID" PRIMARY KEY
-    (DepartmentID);
-CLUSTER HumanResources.Department USING "PK_Department_DepartmentID";
-
-ALTER TABLE HumanResources.Employee ADD
-    CONSTRAINT "PK_Employee_BusinessEntityID" PRIMARY KEY
-    (BusinessEntityID);
-CLUSTER HumanResources.Employee USING "PK_Employee_BusinessEntityID";
-
-ALTER TABLE HumanResources.EmployeeDepartmentHistory ADD
-    CONSTRAINT "PK_EmployeeDepartmentHistory_BusinessEntityID_StartDate_Departm" PRIMARY KEY
-    (BusinessEntityID, StartDate, DepartmentID, ShiftID);
-CLUSTER HumanResources.EmployeeDepartmentHistory USING "PK_EmployeeDepartmentHistory_BusinessEntityID_StartDate_Departm";
-
-ALTER TABLE HumanResources.EmployeePayHistory ADD
-    CONSTRAINT "PK_EmployeePayHistory_BusinessEntityID_RateChangeDate" PRIMARY KEY
-    (BusinessEntityID, RateChangeDate);
-CLUSTER HumanResources.EmployeePayHistory USING "PK_EmployeePayHistory_BusinessEntityID_RateChangeDate";
-
-ALTER TABLE HumanResources.JobCandidate ADD
-    CONSTRAINT "PK_JobCandidate_JobCandidateID" PRIMARY KEY
-    (JobCandidateID);
-CLUSTER HumanResources.JobCandidate USING "PK_JobCandidate_JobCandidateID";
-
-ALTER TABLE Production.Illustration ADD
-    CONSTRAINT "PK_Illustration_IllustrationID" PRIMARY KEY
-    (IllustrationID);
-CLUSTER Production.Illustration USING "PK_Illustration_IllustrationID";
-
-ALTER TABLE Production.Location ADD
-    CONSTRAINT "PK_Location_LocationID" PRIMARY KEY
-    (LocationID);
-CLUSTER Production.Location USING "PK_Location_LocationID";
-
-ALTER TABLE Person.Password ADD
-    CONSTRAINT "PK_Password_BusinessEntityID" PRIMARY KEY
-    (BusinessEntityID);
-CLUSTER Person.Password USING "PK_Password_BusinessEntityID";
-
-ALTER TABLE Person.Person ADD
-    CONSTRAINT "PK_Person_BusinessEntityID" PRIMARY KEY
-    (BusinessEntityID);
-CLUSTER Person.Person USING "PK_Person_BusinessEntityID";
-
-ALTER TABLE Person.PersonPhone ADD
-    CONSTRAINT "PK_PersonPhone_BusinessEntityID_PhoneNumber_PhoneNumberTypeID" PRIMARY KEY
-    (BusinessEntityID, PhoneNumber, PhoneNumberTypeID);
-CLUSTER Person.PersonPhone USING "PK_PersonPhone_BusinessEntityID_PhoneNumber_PhoneNumberTypeID";
-
-ALTER TABLE Person.PhoneNumberType ADD
-    CONSTRAINT "PK_PhoneNumberType_PhoneNumberTypeID" PRIMARY KEY
-    (PhoneNumberTypeID);
-CLUSTER Person.PhoneNumberType USING "PK_PhoneNumberType_PhoneNumberTypeID";
-
-ALTER TABLE Production.Product ADD
-    CONSTRAINT "PK_Product_ProductID" PRIMARY KEY
-    (ProductID);
-CLUSTER Production.Product USING "PK_Product_ProductID";
-
-ALTER TABLE Production.ProductCategory ADD
-    CONSTRAINT "PK_ProductCategory_ProductCategoryID" PRIMARY KEY
-    (ProductCategoryID);
-CLUSTER Production.ProductCategory USING "PK_ProductCategory_ProductCategoryID";
-
-ALTER TABLE Production.ProductCostHistory ADD
-    CONSTRAINT "PK_ProductCostHistory_ProductID_StartDate" PRIMARY KEY
-    (ProductID, StartDate);
-CLUSTER Production.ProductCostHistory USING "PK_ProductCostHistory_ProductID_StartDate";
-
-ALTER TABLE Production.ProductDescription ADD
-    CONSTRAINT "PK_ProductDescription_ProductDescriptionID" PRIMARY KEY
-    (ProductDescriptionID);
-CLUSTER Production.ProductDescription USING "PK_ProductDescription_ProductDescriptionID";
-
-ALTER TABLE Production.ProductDocument ADD
-    CONSTRAINT "PK_ProductDocument_ProductID_DocumentNode" PRIMARY KEY
-    (ProductID, DocumentNode);
-CLUSTER Production.ProductDocument USING "PK_ProductDocument_ProductID_DocumentNode";
-
-ALTER TABLE Production.ProductInventory ADD
-    CONSTRAINT "PK_ProductInventory_ProductID_LocationID" PRIMARY KEY
-    (ProductID, LocationID);
-CLUSTER Production.ProductInventory USING "PK_ProductInventory_ProductID_LocationID";
-
-ALTER TABLE Production.ProductListPriceHistory ADD
-    CONSTRAINT "PK_ProductListPriceHistory_ProductID_StartDate" PRIMARY KEY
-    (ProductID, StartDate);
-CLUSTER Production.ProductListPriceHistory USING "PK_ProductListPriceHistory_ProductID_StartDate";
-
-ALTER TABLE Production.ProductModel ADD
-    CONSTRAINT "PK_ProductModel_ProductModelID" PRIMARY KEY
-    (ProductModelID);
-CLUSTER Production.ProductModel USING "PK_ProductModel_ProductModelID";
-
-ALTER TABLE Production.ProductModelIllustration ADD
-    CONSTRAINT "PK_ProductModelIllustration_ProductModelID_IllustrationID" PRIMARY KEY
-    (ProductModelID, IllustrationID);
-CLUSTER Production.ProductModelIllustration USING "PK_ProductModelIllustration_ProductModelID_IllustrationID";
-
-ALTER TABLE Production.ProductModelProductDescriptionCulture ADD
-    CONSTRAINT "PK_ProductModelProductDescriptionCulture_ProductModelID_Product" PRIMARY KEY
-    (ProductModelID, ProductDescriptionID, CultureID);
-CLUSTER Production.ProductModelProductDescriptionCulture USING "PK_ProductModelProductDescriptionCulture_ProductModelID_Product";
-
-ALTER TABLE Production.ProductPhoto ADD
-    CONSTRAINT "PK_ProductPhoto_ProductPhotoID" PRIMARY KEY
-    (ProductPhotoID);
-CLUSTER Production.ProductPhoto USING "PK_ProductPhoto_ProductPhotoID";
-
-ALTER TABLE Production.ProductProductPhoto ADD
-    CONSTRAINT "PK_ProductProductPhoto_ProductID_ProductPhotoID" PRIMARY KEY
-    (ProductID, ProductPhotoID);
-
-ALTER TABLE Production.ProductReview ADD
-    CONSTRAINT "PK_ProductReview_ProductReviewID" PRIMARY KEY
-    (ProductReviewID);
-CLUSTER Production.ProductReview USING "PK_ProductReview_ProductReviewID";
-
-ALTER TABLE Production.ProductSubcategory ADD
-    CONSTRAINT "PK_ProductSubcategory_ProductSubcategoryID" PRIMARY KEY
-    (ProductSubcategoryID);
-CLUSTER Production.ProductSubcategory USING "PK_ProductSubcategory_ProductSubcategoryID";
-
-ALTER TABLE Purchasing.ProductVendor ADD
-    CONSTRAINT "PK_ProductVendor_ProductID_BusinessEntityID" PRIMARY KEY
-    (ProductID, BusinessEntityID);
-CLUSTER Purchasing.ProductVendor USING "PK_ProductVendor_ProductID_BusinessEntityID";
-
-ALTER TABLE Purchasing.PurchaseOrderDetail ADD
-    CONSTRAINT "PK_PurchaseOrderDetail_PurchaseOrderID_PurchaseOrderDetailID" PRIMARY KEY
-    (PurchaseOrderID, PurchaseOrderDetailID);
-CLUSTER Purchasing.PurchaseOrderDetail USING "PK_PurchaseOrderDetail_PurchaseOrderID_PurchaseOrderDetailID";
-
-ALTER TABLE Purchasing.PurchaseOrderHeader ADD
-    CONSTRAINT "PK_PurchaseOrderHeader_PurchaseOrderID" PRIMARY KEY
-    (PurchaseOrderID);
-CLUSTER Purchasing.PurchaseOrderHeader USING "PK_PurchaseOrderHeader_PurchaseOrderID";
-
-ALTER TABLE Sales.PersonCreditCard ADD
-    CONSTRAINT "PK_PersonCreditCard_BusinessEntityID_CreditCardID" PRIMARY KEY
-    (BusinessEntityID, CreditCardID);
-CLUSTER Sales.PersonCreditCard USING "PK_PersonCreditCard_BusinessEntityID_CreditCardID";
-
-ALTER TABLE Sales.SalesOrderDetail ADD
-    CONSTRAINT "PK_SalesOrderDetail_SalesOrderID_SalesOrderDetailID" PRIMARY KEY
-    (SalesOrderID, SalesOrderDetailID);
-CLUSTER Sales.SalesOrderDetail USING "PK_SalesOrderDetail_SalesOrderID_SalesOrderDetailID";
-
-ALTER TABLE Sales.SalesOrderHeader ADD
-    CONSTRAINT "PK_SalesOrderHeader_SalesOrderID" PRIMARY KEY
-    (SalesOrderID);
-CLUSTER Sales.SalesOrderHeader USING "PK_SalesOrderHeader_SalesOrderID";
-
-ALTER TABLE Sales.SalesOrderHeaderSalesReason ADD
-    CONSTRAINT "PK_SalesOrderHeaderSalesReason_SalesOrderID_SalesReasonID" PRIMARY KEY
-    (SalesOrderID, SalesReasonID);
-CLUSTER Sales.SalesOrderHeaderSalesReason USING "PK_SalesOrderHeaderSalesReason_SalesOrderID_SalesReasonID";
-
-ALTER TABLE Sales.SalesPerson ADD
-    CONSTRAINT "PK_SalesPerson_BusinessEntityID" PRIMARY KEY
-    (BusinessEntityID);
-CLUSTER Sales.SalesPerson USING "PK_SalesPerson_BusinessEntityID";
-
-ALTER TABLE Sales.SalesPersonQuotaHistory ADD
-    CONSTRAINT "PK_SalesPersonQuotaHistory_BusinessEntityID_QuotaDate" PRIMARY KEY
-    (BusinessEntityID, QuotaDate); -- ProductCategoryID);
-CLUSTER Sales.SalesPersonQuotaHistory USING "PK_SalesPersonQuotaHistory_BusinessEntityID_QuotaDate";
-
-ALTER TABLE Sales.SalesReason ADD
-    CONSTRAINT "PK_SalesReason_SalesReasonID" PRIMARY KEY
-    (SalesReasonID);
-CLUSTER Sales.SalesReason USING "PK_SalesReason_SalesReasonID";
-
-ALTER TABLE Sales.SalesTaxRate ADD
-    CONSTRAINT "PK_SalesTaxRate_SalesTaxRateID" PRIMARY KEY
-    (SalesTaxRateID);
-CLUSTER Sales.SalesTaxRate USING "PK_SalesTaxRate_SalesTaxRateID";
-
-ALTER TABLE Sales.SalesTerritory ADD
-    CONSTRAINT "PK_SalesTerritory_TerritoryID" PRIMARY KEY
-    (TerritoryID);
-CLUSTER Sales.SalesTerritory USING "PK_SalesTerritory_TerritoryID";
-
-ALTER TABLE Sales.SalesTerritoryHistory ADD
-    CONSTRAINT "PK_SalesTerritoryHistory_BusinessEntityID_StartDate_TerritoryID" PRIMARY KEY
-    (BusinessEntityID,  --Sales person,
-     StartDate, TerritoryID);
-CLUSTER Sales.SalesTerritoryHistory USING "PK_SalesTerritoryHistory_BusinessEntityID_StartDate_TerritoryID";
-
-ALTER TABLE Production.ScrapReason ADD
-    CONSTRAINT "PK_ScrapReason_ScrapReasonID" PRIMARY KEY
-    (ScrapReasonID);
-CLUSTER Production.ScrapReason USING "PK_ScrapReason_ScrapReasonID";
-
-ALTER TABLE HumanResources.Shift ADD
-    CONSTRAINT "PK_Shift_ShiftID" PRIMARY KEY
-    (ShiftID);
-CLUSTER HumanResources.Shift USING "PK_Shift_ShiftID";
-
-ALTER TABLE Purchasing.ShipMethod ADD
-    CONSTRAINT "PK_ShipMethod_ShipMethodID" PRIMARY KEY
-    (ShipMethodID);
-CLUSTER Purchasing.ShipMethod USING "PK_ShipMethod_ShipMethodID";
-
-ALTER TABLE Sales.ShoppingCartItem ADD
-    CONSTRAINT "PK_ShoppingCartItem_ShoppingCartItemID" PRIMARY KEY
-    (ShoppingCartItemID);
-CLUSTER Sales.ShoppingCartItem USING "PK_ShoppingCartItem_ShoppingCartItemID";
-
-ALTER TABLE Sales.SpecialOffer ADD
-    CONSTRAINT "PK_SpecialOffer_SpecialOfferID" PRIMARY KEY
-    (SpecialOfferID);
-CLUSTER Sales.SpecialOffer USING "PK_SpecialOffer_SpecialOfferID";
-
-ALTER TABLE Sales.SpecialOfferProduct ADD
-    CONSTRAINT "PK_SpecialOfferProduct_SpecialOfferID_ProductID" PRIMARY KEY
-    (SpecialOfferID, ProductID);
-CLUSTER Sales.SpecialOfferProduct USING "PK_SpecialOfferProduct_SpecialOfferID_ProductID";
-
-ALTER TABLE Person.StateProvince ADD
-    CONSTRAINT "PK_StateProvince_StateProvinceID" PRIMARY KEY
-    (StateProvinceID);
-CLUSTER Person.StateProvince USING "PK_StateProvince_StateProvinceID";
-
-ALTER TABLE Sales.Store ADD
-    CONSTRAINT "PK_Store_BusinessEntityID" PRIMARY KEY
-    (BusinessEntityID);
-CLUSTER Sales.Store USING "PK_Store_BusinessEntityID";
-
-ALTER TABLE Production.TransactionHistory ADD
-    CONSTRAINT "PK_TransactionHistory_TransactionID" PRIMARY KEY
-    (TransactionID);
-CLUSTER Production.TransactionHistory USING "PK_TransactionHistory_TransactionID";
-
-ALTER TABLE Production.TransactionHistoryArchive ADD
-    CONSTRAINT "PK_TransactionHistoryArchive_TransactionID" PRIMARY KEY
-    (TransactionID);
-CLUSTER Production.TransactionHistoryArchive USING "PK_TransactionHistoryArchive_TransactionID";
-
-ALTER TABLE Production.UnitMeasure ADD
-    CONSTRAINT "PK_UnitMeasure_UnitMeasureCode" PRIMARY KEY
-    (UnitMeasureCode);
-CLUSTER Production.UnitMeasure USING "PK_UnitMeasure_UnitMeasureCode";
-
-ALTER TABLE Purchasing.Vendor ADD
-    CONSTRAINT "PK_Vendor_BusinessEntityID" PRIMARY KEY
-    (BusinessEntityID);
-CLUSTER Purchasing.Vendor USING "PK_Vendor_BusinessEntityID";
-
-ALTER TABLE Production.WorkOrder ADD
-    CONSTRAINT "PK_WorkOrder_WorkOrderID" PRIMARY KEY
-    (WorkOrderID);
-CLUSTER Production.WorkOrder USING "PK_WorkOrder_WorkOrderID";
-
-ALTER TABLE Production.WorkOrderRouting ADD
-    CONSTRAINT "PK_WorkOrderRouting_WorkOrderID_ProductID_OperationSequence" PRIMARY KEY
-    (WorkOrderID, ProductID, OperationSequence);
-CLUSTER Production.WorkOrderRouting USING "PK_WorkOrderRouting_WorkOrderID_ProductID_OperationSequence";
+alter table person.address add
+    constraint "pk_address_address_id" primary key
+    (address_id);
+cluster person.address using "pk_address_address_id";
+
+alter table person.address_type add
+    constraint "pk_address_type_address_type_id" primary key
+    (address_type_id);
+cluster person.address_type using "pk_address_type_address_type_id";
+
+alter table production.bill_of_materials add
+    constraint "pk_bill_of_materials_bill_of_materials_id" primary key
+    (bill_of_materials_id);
+
+alter table person.business_entity add
+    constraint "pk_b_entity_business_entity_id" primary key
+    (business_entity_id);
+cluster person.business_entity using "pk_b_entity_business_entity_id";
+
+alter table person.business_entity_address add
+    constraint "pk_b_entity_address_b_entity_id_address_id_address_type" primary key
+    (business_entity_id, address_id, address_type_id);
+cluster person.business_entity_address using "pk_b_entity_address_b_entity_id_address_id_address_type";
+
+alter table person.business_entity_contact add
+    constraint "pk_b_entity_contact_b_entity_id_person_id_contact_type_id" primary key
+    (business_entity_id, person_id, contact_type_id);
+cluster person.business_entity_contact using "pk_b_entity_contact_b_entity_id_person_id_contact_type_id";
+
+alter table person.contact_type add
+    constraint "pk_contact_type_contact_type_id" primary key
+    (contact_type_id);
+cluster person.contact_type using "pk_contact_type_contact_type_id";
+
+alter table sales.country_region_currency add
+    constraint "pk_country_region_currency_country_region_code_currency_code" primary key
+    (country_region_code, currency_code);
+cluster sales.country_region_currency using "pk_country_region_currency_country_region_code_currency_code";
+
+alter table person.country_region add
+    constraint "pk_country_region_country_region_code" primary key
+    (country_region_code);
+cluster person.country_region using "pk_country_region_country_region_code";
+
+alter table sales.credit_card add
+    constraint "pk_credit_card_credit_card_id" primary key
+    (credit_card_id);
+cluster sales.credit_card using "pk_credit_card_credit_card_id";
+
+alter table sales.currency add
+    constraint "pk_currency_currency_code" primary key
+    (currency_code);
+cluster sales.currency using "pk_currency_currency_code";
+
+alter table sales.currency_rate add
+    constraint "pk_currency_rate_currency_rate_id" primary key
+    (currency_rate_id);
+cluster sales.currency_rate using "pk_currency_rate_currency_rate_id";
+
+alter table sales.customer add
+    constraint "pk_customer_customer_id" primary key
+    (customer_id);
+cluster sales.customer using "pk_customer_customer_id";
+
+alter table production.culture add
+    constraint "pk_culture_culture_id" primary key
+    (culture_id);
+cluster production.culture using "pk_culture_culture_id";
+
+alter table production.document add
+    constraint "pk_document_document_node" primary key
+    (document_node);
+cluster production.document using "pk_document_document_node";
+
+alter table person.email_address add
+    constraint "pk_email_addr_b_entity_id_email_addr_id" primary key
+    (business_entity_id, email_address_id);
+cluster person.email_address using "pk_email_addr_b_entity_id_email_addr_id";
+
+alter table human_resources.department add
+    constraint "pk_dept_dept_id" primary key
+    (department_id);
+cluster human_resources.department using "pk_dept_dept_id";
+
+alter table human_resources.employee add
+    constraint "pk_employee_b_entity_id" primary key
+    (business_entity_id);
+cluster human_resources.employee using "pk_employee_b_entity_id";
+
+alter table human_resources.employee_department_history add
+    constraint "pk_employee_dept_history_b_entity_id_start_date_departm" primary key
+    (business_entity_id, start_date, department_id, shift_id);
+cluster human_resources.employee_department_history using "pk_employee_dept_history_b_entity_id_start_date_departm";
+
+alter table human_resources.employee_pay_history add
+    constraint "pk_employee_pay_history_b_entity_id_rate_change_date" primary key
+    (business_entity_id, rate_change_date);
+cluster human_resources.employee_pay_history using "pk_employee_pay_history_b_entity_id_rate_change_date";
+
+alter table human_resources.job_candidate add
+    constraint "pk_job_candidate_job_candidate_id" primary key
+    (job_candidate_id);
+cluster human_resources.job_candidate using "pk_job_candidate_job_candidate_id";
+
+alter table production.illustration add
+    constraint "pk_illustration_illustration_id" primary key
+    (illustration_id);
+cluster production.illustration using "pk_illustration_illustration_id";
+
+alter table production.location add
+    constraint "pk_location_location_id" primary key
+    (location_id);
+cluster production.location using "pk_location_location_id";
+
+alter table person.password add
+    constraint "pk_password_b_entity_id" primary key
+    (business_entity_id);
+cluster person.password using "pk_password_b_entity_id";
+
+alter table person.person add
+    constraint "pk_person_b_entity_id" primary key
+    (business_entity_id);
+cluster person.person using "pk_person_b_entity_id";
+
+alter table person.person_phone add
+    constraint "pk_person_phone_b_entity_id_phone_number_phone_number_type_id" primary key
+    (business_entity_id, phone_number, phone_number_type_id);
+cluster person.person_phone using "pk_person_phone_b_entity_id_phone_number_phone_number_type_id";
+
+alter table person.phone_number_type add
+    constraint "pk_phone_number_type_phone_number_type_id" primary key
+    (phone_number_type_id);
+cluster person.phone_number_type using "pk_phone_number_type_phone_number_type_id";
+
+alter table production.product add
+    constraint "pk_product_product_id" primary key
+    (product_id);
+cluster production.product using "pk_product_product_id";
+
+alter table production.product_category add
+    constraint "pk_product_category_product_category_id" primary key
+    (product_category_id);
+cluster production.product_category using "pk_product_category_product_category_id";
+
+alter table production.product_cost_history add
+    constraint "pk_product_cost_history_product_id_start_date" primary key
+    (product_id, start_date);
+cluster production.product_cost_history using "pk_product_cost_history_product_id_start_date";
+
+alter table production.product_description add
+    constraint "pk_product_description_product_description_id" primary key
+    (product_description_id);
+cluster production.product_description using "pk_product_description_product_description_id";
+
+alter table production.product_document add
+    constraint "pk_product_document_product_id_document_node" primary key
+    (product_id, document_node);
+cluster production.product_document using "pk_product_document_product_id_document_node";
+
+alter table production.product_inventory add
+    constraint "pk_product_inventory_product_id_location_id" primary key
+    (product_id, location_id);
+cluster production.product_inventory using "pk_product_inventory_product_id_location_id";
+
+alter table production.product_list_price_history add
+    constraint "pk_product_list_price_history_product_id_start_date" primary key
+    (product_id, start_date);
+cluster production.product_list_price_history using "pk_product_list_price_history_product_id_start_date";
+
+alter table production.product_model add
+    constraint "pk_product_model_product_model_id" primary key
+    (product_model_id);
+cluster production.product_model using "pk_product_model_product_model_id";
+
+alter table production.product_model_illustration add
+    constraint "pk_product_model_illust_product_model_id_illust_id" primary key
+    (product_model_id, illustration_id);
+cluster production.product_model_illustration using "pk_product_model_illust_product_model_id_illust_id";
+
+alter table production.product_model_product_description_culture add
+    constraint "pk_product_model_product_desc_culture_product_model_id_prod" primary key
+    (product_model_id, product_description_id, culture_id);
+cluster production.product_model_product_description_culture using "pk_product_model_product_desc_culture_product_model_id_prod";
+
+alter table production.product_photo add
+    constraint "pk_product_photo_product_photo_id" primary key
+    (product_photo_id);
+cluster production.product_photo using "pk_product_photo_product_photo_id";
+
+alter table production.product_product_photo add
+    constraint "pk_product_product_photo_product_id_product_photo_id" primary key
+    (product_id, product_photo_id);
+
+alter table production.product_review add
+    constraint "pk_product_review_product_review_id" primary key
+    (product_review_id);
+cluster production.product_review using "pk_product_review_product_review_id";
+
+alter table production.product_subcategory add
+    constraint "pk_product_subcategory_product_subcategory_id" primary key
+    (product_subcategory_id);
+cluster production.product_subcategory using "pk_product_subcategory_product_subcategory_id";
+
+alter table purchasing.product_vendor add
+    constraint "pk_product_vendor_product_id_b_entity_id" primary key
+    (product_id, business_entity_id);
+cluster purchasing.product_vendor using "pk_product_vendor_product_id_b_entity_id";
+
+alter table purchasing.purchase_order_detail add
+    constraint "pk_purch_order_detail_purch_order_id_purch_order_detail_id" primary key
+    (purchase_order_id, purchase_order_detail_id);
+cluster purchasing.purchase_order_detail using "pk_purch_order_detail_purch_order_id_purch_order_detail_id";
+
+alter table purchasing.purchase_order_header add
+    constraint "pk_purchase_order_header_purchase_order_id" primary key
+    (purchase_order_id);
+cluster purchasing.purchase_order_header using "pk_purchase_order_header_purchase_order_id";
+
+alter table sales.person_credit_card add
+    constraint "pk_person_credit_card_b_entity_id_credit_card_id" primary key
+    (business_entity_id, credit_card_id);
+cluster sales.person_credit_card using "pk_person_credit_card_b_entity_id_credit_card_id";
+
+alter table sales.sales_order_detail add
+    constraint "pk_sales_order_detail_sales_order_id_sales_order_detail_id" primary key
+    (sales_order_id, sales_order_detail_id);
+cluster sales.sales_order_detail using "pk_sales_order_detail_sales_order_id_sales_order_detail_id";
+
+alter table sales.sales_order_header add
+    constraint "pk_sales_order_header_sales_order_id" primary key
+    (sales_order_id);
+cluster sales.sales_order_header using "pk_sales_order_header_sales_order_id";
+
+alter table sales.sales_order_header_sales_reason add
+    constraint "pk_sales_order_header_sale_reason_sale_order_id_sale_reason_id" primary key
+    (sales_order_id, sales_reason_id);
+cluster sales.sales_order_header_sales_reason using "pk_sales_order_header_sale_reason_sale_order_id_sale_reason_id";
+
+alter table sales.sales_person add
+    constraint "pk_sales_person_b_entity_id" primary key
+    (business_entity_id);
+cluster sales.sales_person using "pk_sales_person_b_entity_id";
+
+alter table sales.sales_person_quota_history add
+    constraint "pk_sales_person_quota_history_b_entity_id_quota_date" primary key
+    (business_entity_id, quota_date); -- product_category_id);
+cluster sales.sales_person_quota_history using "pk_sales_person_quota_history_b_entity_id_quota_date";
+
+alter table sales.sales_reason add
+    constraint "pk_sales_reason_sales_reason_id" primary key
+    (sales_reason_id);
+cluster sales.sales_reason using "pk_sales_reason_sales_reason_id";
+
+alter table sales.sales_tax_rate add
+    constraint "pk_sales_tax_rate_sales_tax_rate_id" primary key
+    (sales_tax_rate_id);
+cluster sales.sales_tax_rate using "pk_sales_tax_rate_sales_tax_rate_id";
+
+alter table sales.sales_territory add
+    constraint "pk_sales_territory_territory_id" primary key
+    (territory_id);
+cluster sales.sales_territory using "pk_sales_territory_territory_id";
+
+alter table sales.sales_territory_history add
+    constraint "pk_sales_territory_history_b_entity_id_start_date_territory_id" primary key
+    (business_entity_id,  --sales person,
+     start_date, territory_id);
+cluster sales.sales_territory_history using "pk_sales_territory_history_b_entity_id_start_date_territory_id";
+
+alter table production.scrap_reason add
+    constraint "pk_scrap_reason_scrap_reason_id" primary key
+    (scrap_reason_id);
+cluster production.scrap_reason using "pk_scrap_reason_scrap_reason_id";
+
+alter table human_resources.shift add
+    constraint "pk_shift_shift_id" primary key
+    (shift_id);
+cluster human_resources.shift using "pk_shift_shift_id";
+
+alter table purchasing.ship_method add
+    constraint "pk_ship_method_ship_method_id" primary key
+    (ship_method_id);
+cluster purchasing.ship_method using "pk_ship_method_ship_method_id";
+
+alter table sales.shopping_cart_item add
+    constraint "pk_shopping_cart_item_shopping_cart_item_id" primary key
+    (shopping_cart_item_id);
+cluster sales.shopping_cart_item using "pk_shopping_cart_item_shopping_cart_item_id";
+
+alter table sales.special_offer add
+    constraint "pk_special_offer_special_offer_id" primary key
+    (special_offer_id);
+cluster sales.special_offer using "pk_special_offer_special_offer_id";
+
+alter table sales.special_offer_product add
+    constraint "pk_special_offer_product_special_offer_id_product_id" primary key
+    (special_offer_id, product_id);
+cluster sales.special_offer_product using "pk_special_offer_product_special_offer_id_product_id";
+
+alter table person.state_province add
+    constraint "pk_state_province_state_province_id" primary key
+    (state_province_id);
+cluster person.state_province using "pk_state_province_state_province_id";
+
+alter table sales.store add
+    constraint "pk_store_b_entity_id" primary key
+    (business_entity_id);
+cluster sales.store using "pk_store_b_entity_id";
+
+alter table production.transaction_history add
+    constraint "pk_transaction_history_transaction_id" primary key
+    (transaction_id);
+cluster production.transaction_history using "pk_transaction_history_transaction_id";
+
+alter table production.transaction_history_archive add
+    constraint "pk_transaction_history_archive_transaction_id" primary key
+    (transaction_id);
+cluster production.transaction_history_archive using "pk_transaction_history_archive_transaction_id";
+
+alter table production.unit_measure add
+    constraint "pk_unit_measure_unit_measure_code" primary key
+    (unit_measure_code);
+cluster production.unit_measure using "pk_unit_measure_unit_measure_code";
+
+alter table purchasing.vendor add
+    constraint "pk_vendor_b_entity_id" primary key
+    (business_entity_id);
+cluster purchasing.vendor using "pk_vendor_b_entity_id";
+
+alter table production.work_order add
+    constraint "pk_work_order_work_order_id" primary key
+    (work_order_id);
+cluster production.work_order using "pk_work_order_work_order_id";
+
+alter table production.work_order_routing add
+    constraint "pk_work_order_routing_work_order_id_product_id_operation_seq" primary key
+    (work_order_id, product_id, operation_sequence);
+cluster production.work_order_routing using "pk_work_order_routing_work_order_id_product_id_operation_seq";
 
 
 
@@ -2137,321 +2136,321 @@ CLUSTER Production.WorkOrderRouting USING "PK_WorkOrderRouting_WorkOrderID_Produ
 -- FOREIGN KEYS
 -------------------------------------
 
-ALTER TABLE Person.Address ADD
-    CONSTRAINT "FK_Address_StateProvince_StateProvinceID" FOREIGN KEY
-    (StateProvinceID) REFERENCES Person.StateProvince(StateProvinceID);
+alter table person.address add
+    constraint "fk_addr_state_province_state_province_id" foreign key
+    (state_province_id) references person.state_province(state_province_id);
 
-ALTER TABLE Production.BillOfMaterials ADD
-    CONSTRAINT "FK_BillOfMaterials_Product_ProductAssemblyID" FOREIGN KEY
-    (ProductAssemblyID) REFERENCES Production.Product(ProductID);
-ALTER TABLE Production.BillOfMaterials ADD
-    CONSTRAINT "FK_BillOfMaterials_Product_ComponentID" FOREIGN KEY
-    (ComponentID) REFERENCES Production.Product(ProductID);
-ALTER TABLE Production.BillOfMaterials ADD
-    CONSTRAINT "FK_BillOfMaterials_UnitMeasure_UnitMeasureCode" FOREIGN KEY
-    (UnitMeasureCode) REFERENCES Production.UnitMeasure(UnitMeasureCode);
+alter table production.bill_of_materials add
+    constraint "fk_bill_of_materials_product_product_assembly_id" foreign key
+    (product_assembly_id) references production.product(product_id);
+alter table production.bill_of_materials add
+    constraint "fk_bill_of_materials_product_component_id" foreign key
+    (component_id) references production.product(product_id);
+alter table production.bill_of_materials add
+    constraint "fk_bill_of_materials_unit_measure_unit_measure_code" foreign key
+    (unit_measure_code) references production.unit_measure(unit_measure_code);
 
-ALTER TABLE Person.BusinessEntityAddress ADD
-    CONSTRAINT "FK_BusinessEntityAddress_Address_AddressID" FOREIGN KEY
-    (AddressID) REFERENCES Person.Address(AddressID);
-ALTER TABLE Person.BusinessEntityAddress ADD
-    CONSTRAINT "FK_BusinessEntityAddress_AddressType_AddressTypeID" FOREIGN KEY
-    (AddressTypeID) REFERENCES Person.AddressType(AddressTypeID);
-ALTER TABLE Person.BusinessEntityAddress ADD
-    CONSTRAINT "FK_BusinessEntityAddress_BusinessEntity_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES Person.BusinessEntity(BusinessEntityID);
+alter table person.business_entity_address add
+    constraint "fk_b_entity_addr_addr_addr_id" foreign key
+    (address_id) references person.address(address_id);
+alter table person.business_entity_address add
+    constraint "fk_b_entity_addr_addr_type_addr_type_id" foreign key
+    (address_type_id) references person.address_type(address_type_id);
+alter table person.business_entity_address add
+    constraint "fk_b_entity_addr_b_entity_b_entity_id" foreign key
+    (business_entity_id) references person.business_entity(business_entity_id);
 
-ALTER TABLE Person.BusinessEntityContact ADD
-    CONSTRAINT "FK_BusinessEntityContact_Person_PersonID" FOREIGN KEY
-    (PersonID) REFERENCES Person.Person(BusinessEntityID);
-ALTER TABLE Person.BusinessEntityContact ADD
-    CONSTRAINT "FK_BusinessEntityContact_ContactType_ContactTypeID" FOREIGN KEY
-    (ContactTypeID) REFERENCES Person.ContactType(ContactTypeID);
-ALTER TABLE Person.BusinessEntityContact ADD
-    CONSTRAINT "FK_BusinessEntityContact_BusinessEntity_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES Person.BusinessEntity(BusinessEntityID);
+alter table person.business_entity_contact add
+    constraint "fk_b_entity_contact_person_person_id" foreign key
+    (person_id) references person.person(business_entity_id);
+alter table person.business_entity_contact add
+    constraint "fk_b_entity_contact_contact_type_contact_type_id" foreign key
+    (contact_type_id) references person.contact_type(contact_type_id);
+alter table person.business_entity_contact add
+    constraint "fk_b_entity_contact_b_entity_b_entity_id" foreign key
+    (business_entity_id) references person.business_entity(business_entity_id);
 
-ALTER TABLE Sales.CountryRegionCurrency ADD
-    CONSTRAINT "FK_CountryRegionCurrency_CountryRegion_CountryRegionCode" FOREIGN KEY
-    (CountryRegionCode) REFERENCES Person.CountryRegion(CountryRegionCode);
-ALTER TABLE Sales.CountryRegionCurrency ADD
-    CONSTRAINT "FK_CountryRegionCurrency_Currency_CurrencyCode" FOREIGN KEY
-    (CurrencyCode) REFERENCES Sales.Currency(CurrencyCode);
+alter table sales.country_region_currency add
+    constraint "fk_country_region_currency_country_region_country_region_code" foreign key
+    (country_region_code) references person.country_region(country_region_code);
+alter table sales.country_region_currency add
+    constraint "fk_country_region_currency_currency_currency_code" foreign key
+    (currency_code) references sales.currency(currency_code);
 
-ALTER TABLE Sales.CurrencyRate ADD
-    CONSTRAINT "FK_CurrencyRate_Currency_FromCurrencyCode" FOREIGN KEY
-    (FromCurrencyCode) REFERENCES Sales.Currency(CurrencyCode);
-ALTER TABLE Sales.CurrencyRate ADD
-    CONSTRAINT "FK_CurrencyRate_Currency_ToCurrencyCode" FOREIGN KEY
-    (ToCurrencyCode) REFERENCES Sales.Currency(CurrencyCode);
+alter table sales.currency_rate add
+    constraint "fk_currency_rate_currency_from_currency_code" foreign key
+    (from_currency_code) references sales.currency(currency_code);
+alter table sales.currency_rate add
+    constraint "fk_currency_rate_currency_to_currency_code" foreign key
+    (to_currency_code) references sales.currency(currency_code);
 
-ALTER TABLE Sales.Customer ADD
-    CONSTRAINT "FK_Customer_Person_PersonID" FOREIGN KEY
-    (PersonID) REFERENCES Person.Person(BusinessEntityID);
-ALTER TABLE Sales.Customer ADD
-    CONSTRAINT "FK_Customer_Store_StoreID" FOREIGN KEY
-    (StoreID) REFERENCES Sales.Store(BusinessEntityID);
-ALTER TABLE Sales.Customer ADD
-    CONSTRAINT "FK_Customer_SalesTerritory_TerritoryID" FOREIGN KEY
-    (TerritoryID) REFERENCES Sales.SalesTerritory(TerritoryID);
+alter table sales.customer add
+    constraint "fk_customer_person_person_id" foreign key
+    (person_id) references person.person(business_entity_id);
+alter table sales.customer add
+    constraint "fk_customer_store_store_id" foreign key
+    (store_id) references sales.store(business_entity_id);
+alter table sales.customer add
+    constraint "fk_customer_sales_territory_territory_id" foreign key
+    (territory_id) references sales.sales_territory(territory_id);
 
-ALTER TABLE Production.Document ADD
-    CONSTRAINT "FK_Document_Employee_Owner" FOREIGN KEY
-    (Owner) REFERENCES HumanResources.Employee(BusinessEntityID);
+alter table production.document add
+    constraint "fk_document_employee_owner" foreign key
+    (owner) references human_resources.employee(business_entity_id);
 
-ALTER TABLE Person.EmailAddress ADD
-    CONSTRAINT "FK_EmailAddress_Person_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES Person.Person(BusinessEntityID);
+alter table person.email_address add
+    constraint "fk_email_addr_person_b_entity_id" foreign key
+    (business_entity_id) references person.person(business_entity_id);
 
-ALTER TABLE HumanResources.Employee ADD
-    CONSTRAINT "FK_Employee_Person_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES Person.Person(BusinessEntityID);
+alter table human_resources.employee add
+    constraint "fk_employee_person_b_entity_id" foreign key
+    (business_entity_id) references person.person(business_entity_id);
 
-ALTER TABLE HumanResources.EmployeeDepartmentHistory ADD
-    CONSTRAINT "FK_EmployeeDepartmentHistory_Department_DepartmentID" FOREIGN KEY
-    (DepartmentID) REFERENCES HumanResources.Department(DepartmentID);
-ALTER TABLE HumanResources.EmployeeDepartmentHistory ADD
-    CONSTRAINT "FK_EmployeeDepartmentHistory_Employee_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES HumanResources.Employee(BusinessEntityID);
-ALTER TABLE HumanResources.EmployeeDepartmentHistory ADD
-    CONSTRAINT "FK_EmployeeDepartmentHistory_Shift_ShiftID" FOREIGN KEY
-    (ShiftID) REFERENCES HumanResources.Shift(ShiftID);
+alter table human_resources.employee_department_history add
+    constraint "fk_employee_dept_history_dept_dept_id" foreign key
+    (department_id) references human_resources.department(department_id);
+alter table human_resources.employee_department_history add
+    constraint "fk_employee_dept_history_employee_b_entity_id" foreign key
+    (business_entity_id) references human_resources.employee(business_entity_id);
+alter table human_resources.employee_department_history add
+    constraint "fk_employee_dept_history_shift_shift_id" foreign key
+    (shift_id) references human_resources.shift(shift_id);
 
-ALTER TABLE HumanResources.EmployeePayHistory ADD
-    CONSTRAINT "FK_EmployeePayHistory_Employee_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES HumanResources.Employee(BusinessEntityID);
+alter table human_resources.employee_pay_history add
+    constraint "fk_employee_pay_history_employee_b_entity_id" foreign key
+    (business_entity_id) references human_resources.employee(business_entity_id);
 
-ALTER TABLE HumanResources.JobCandidate ADD
-    CONSTRAINT "FK_JobCandidate_Employee_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES HumanResources.Employee(BusinessEntityID);
+alter table human_resources.job_candidate add
+    constraint "fk_job_candidate_employee_b_entity_id" foreign key
+    (business_entity_id) references human_resources.employee(business_entity_id);
 
-ALTER TABLE Person.Password ADD
-    CONSTRAINT "FK_Password_Person_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES Person.Person(BusinessEntityID);
+alter table person.password add
+    constraint "fk_password_person_b_entity_id" foreign key
+    (business_entity_id) references person.person(business_entity_id);
 
-ALTER TABLE Person.Person ADD
-    CONSTRAINT "FK_Person_BusinessEntity_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES Person.BusinessEntity(BusinessEntityID);
+alter table person.person add
+    constraint "fk_person_b_entity_b_entity_id" foreign key
+    (business_entity_id) references person.business_entity(business_entity_id);
 
-ALTER TABLE Sales.PersonCreditCard ADD
-    CONSTRAINT "FK_PersonCreditCard_Person_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES Person.Person(BusinessEntityID);
-ALTER TABLE Sales.PersonCreditCard ADD
-    CONSTRAINT "FK_PersonCreditCard_CreditCard_CreditCardID" FOREIGN KEY
-    (CreditCardID) REFERENCES Sales.CreditCard(CreditCardID);
+alter table sales.person_credit_card add
+    constraint "fk_person_credit_card_person_b_entity_id" foreign key
+    (business_entity_id) references person.person(business_entity_id);
+alter table sales.person_credit_card add
+    constraint "fk_person_credit_card_credit_card_credit_card_id" foreign key
+    (credit_card_id) references sales.credit_card(credit_card_id);
 
-ALTER TABLE Person.PersonPhone ADD
-    CONSTRAINT "FK_PersonPhone_Person_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES Person.Person(BusinessEntityID);
-ALTER TABLE Person.PersonPhone ADD
-    CONSTRAINT "FK_PersonPhone_PhoneNumberType_PhoneNumberTypeID" FOREIGN KEY
-    (PhoneNumberTypeID) REFERENCES Person.PhoneNumberType(PhoneNumberTypeID);
+alter table person.person_phone add
+    constraint "fk_person_phone_person_b_entity_id" foreign key
+    (business_entity_id) references person.person(business_entity_id);
+alter table person.person_phone add
+    constraint "fk_person_phone_phone_number_type_phone_number_type_id" foreign key
+    (phone_number_type_id) references person.phone_number_type(phone_number_type_id);
 
-ALTER TABLE Production.Product ADD
-    CONSTRAINT "FK_Product_UnitMeasure_SizeUnitMeasureCode" FOREIGN KEY
-    (SizeUnitMeasureCode) REFERENCES Production.UnitMeasure(UnitMeasureCode);
-ALTER TABLE Production.Product ADD
-    CONSTRAINT "FK_Product_UnitMeasure_WeightUnitMeasureCode" FOREIGN KEY
-    (WeightUnitMeasureCode) REFERENCES Production.UnitMeasure(UnitMeasureCode);
-ALTER TABLE Production.Product ADD
-    CONSTRAINT "FK_Product_ProductModel_ProductModelID" FOREIGN KEY
-    (ProductModelID) REFERENCES Production.ProductModel(ProductModelID);
-ALTER TABLE Production.Product ADD
-    CONSTRAINT "FK_Product_ProductSubcategory_ProductSubcategoryID" FOREIGN KEY
-    (ProductSubcategoryID) REFERENCES Production.ProductSubcategory(ProductSubcategoryID);
+alter table production.product add
+    constraint "fk_product_unit_measure_size_unit_measure_code" foreign key
+    (size_unit_measure_code) references production.unit_measure(unit_measure_code);
+alter table production.product add
+    constraint "fk_product_unit_measure_weight_unit_measure_code" foreign key
+    (weight_unit_measure_code) references production.unit_measure(unit_measure_code);
+alter table production.product add
+    constraint "fk_product_product_model_product_model_id" foreign key
+    (product_model_id) references production.product_model(product_model_id);
+alter table production.product add
+    constraint "fk_product_product_subcategory_product_subcategory_id" foreign key
+    (product_subcategory_id) references production.product_subcategory(product_subcategory_id);
 
-ALTER TABLE Production.ProductCostHistory ADD
-    CONSTRAINT "FK_ProductCostHistory_Product_ProductID" FOREIGN KEY
-    (ProductID) REFERENCES Production.Product(ProductID);
+alter table production.product_cost_history add
+    constraint "fk_product_cost_history_product_product_id" foreign key
+    (product_id) references production.product(product_id);
 
-ALTER TABLE Production.ProductDocument ADD
-    CONSTRAINT "FK_ProductDocument_Product_ProductID" FOREIGN KEY
-    (ProductID) REFERENCES Production.Product(ProductID);
-ALTER TABLE Production.ProductDocument ADD
-    CONSTRAINT "FK_ProductDocument_Document_DocumentNode" FOREIGN KEY
-    (DocumentNode) REFERENCES Production.Document(DocumentNode);
+alter table production.product_document add
+    constraint "fk_product_document_product_product_id" foreign key
+    (product_id) references production.product(product_id);
+alter table production.product_document add
+    constraint "fk_product_document_document_document_node" foreign key
+    (document_node) references production.document(document_node);
 
-ALTER TABLE Production.ProductInventory ADD
-    CONSTRAINT "FK_ProductInventory_Location_LocationID" FOREIGN KEY
-    (LocationID) REFERENCES Production.Location(LocationID);
-ALTER TABLE Production.ProductInventory ADD
-    CONSTRAINT "FK_ProductInventory_Product_ProductID" FOREIGN KEY
-    (ProductID) REFERENCES Production.Product(ProductID);
+alter table production.product_inventory add
+    constraint "fk_product_inventory_location_location_id" foreign key
+    (location_id) references production.location(location_id);
+alter table production.product_inventory add
+    constraint "fk_product_inventory_product_product_id" foreign key
+    (product_id) references production.product(product_id);
 
-ALTER TABLE Production.ProductListPriceHistory ADD
-    CONSTRAINT "FK_ProductListPriceHistory_Product_ProductID" FOREIGN KEY
-    (ProductID) REFERENCES Production.Product(ProductID);
+alter table production.product_list_price_history add
+    constraint "fk_product_list_price_history_product_product_id" foreign key
+    (product_id) references production.product(product_id);
 
-ALTER TABLE Production.ProductModelIllustration ADD
-    CONSTRAINT "FK_ProductModelIllustration_ProductModel_ProductModelID" FOREIGN KEY
-    (ProductModelID) REFERENCES Production.ProductModel(ProductModelID);
-ALTER TABLE Production.ProductModelIllustration ADD
-    CONSTRAINT "FK_ProductModelIllustration_Illustration_IllustrationID" FOREIGN KEY
-    (IllustrationID) REFERENCES Production.Illustration(IllustrationID);
+alter table production.product_model_illustration add
+    constraint "fk_product_model_illustration_product_model_product_model_id" foreign key
+    (product_model_id) references production.product_model(product_model_id);
+alter table production.product_model_illustration add
+    constraint "fk_product_model_illustration_illustration_illustration_id" foreign key
+    (illustration_id) references production.illustration(illustration_id);
 
-ALTER TABLE Production.ProductModelProductDescriptionCulture ADD
-    CONSTRAINT "FK_ProductModelProductDescriptionCulture_ProductDescription_Pro" FOREIGN KEY
-    (ProductDescriptionID) REFERENCES Production.ProductDescription(ProductDescriptionID);
-ALTER TABLE Production.ProductModelProductDescriptionCulture ADD
-    CONSTRAINT "FK_ProductModelProductDescriptionCulture_Culture_CultureID" FOREIGN KEY
-    (CultureID) REFERENCES Production.Culture(CultureID);
-ALTER TABLE Production.ProductModelProductDescriptionCulture ADD
-    CONSTRAINT "FK_ProductModelProductDescriptionCulture_ProductModel_ProductMo" FOREIGN KEY
-    (ProductModelID) REFERENCES Production.ProductModel(ProductModelID);
+alter table production.product_model_product_description_culture add
+    constraint "fk_product_model_product_desc_culture_product_desc_pro" foreign key
+    (product_description_id) references production.product_description(product_description_id);
+alter table production.product_model_product_description_culture add
+    constraint "fk_product_model_product_desc_culture_culture_id" foreign key
+    (culture_id) references production.culture(culture_id);
+alter table production.product_model_product_description_culture add
+    constraint "fk_product_model_product_desc_culture_product_model_id" foreign key
+    (product_model_id) references production.product_model(product_model_id);
 
-ALTER TABLE Production.ProductProductPhoto ADD
-    CONSTRAINT "FK_ProductProductPhoto_Product_ProductID" FOREIGN KEY
-    (ProductID) REFERENCES Production.Product(ProductID);
-ALTER TABLE Production.ProductProductPhoto ADD
-    CONSTRAINT "FK_ProductProductPhoto_ProductPhoto_ProductPhotoID" FOREIGN KEY
-    (ProductPhotoID) REFERENCES Production.ProductPhoto(ProductPhotoID);
+alter table production.product_product_photo add
+    constraint "fk_product_product_photo_product_product_id" foreign key
+    (product_id) references production.product(product_id);
+alter table production.product_product_photo add
+    constraint "fk_product_product_photo_product_photo_product_photo_id" foreign key
+    (product_photo_id) references production.product_photo(product_photo_id);
 
-ALTER TABLE Production.ProductReview ADD
-    CONSTRAINT "FK_ProductReview_Product_ProductID" FOREIGN KEY
-    (ProductID) REFERENCES Production.Product(ProductID);
+alter table production.product_review add
+    constraint "fk_product_review_product_product_id" foreign key
+    (product_id) references production.product(product_id);
 
-ALTER TABLE Production.ProductSubcategory ADD
-    CONSTRAINT "FK_ProductSubcategory_ProductCategory_ProductCategoryID" FOREIGN KEY
-    (ProductCategoryID) REFERENCES Production.ProductCategory(ProductCategoryID);
+alter table production.product_subcategory add
+    constraint "fk_product_subcategory_product_category_product_category_id" foreign key
+    (product_category_id) references production.product_category(product_category_id);
 
-ALTER TABLE Purchasing.ProductVendor ADD
-    CONSTRAINT "FK_ProductVendor_Product_ProductID" FOREIGN KEY
-    (ProductID) REFERENCES Production.Product(ProductID);
-ALTER TABLE Purchasing.ProductVendor ADD
-    CONSTRAINT "FK_ProductVendor_UnitMeasure_UnitMeasureCode" FOREIGN KEY
-    (UnitMeasureCode) REFERENCES Production.UnitMeasure(UnitMeasureCode);
-ALTER TABLE Purchasing.ProductVendor ADD
-    CONSTRAINT "FK_ProductVendor_Vendor_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES Purchasing.Vendor(BusinessEntityID);
+alter table purchasing.product_vendor add
+    constraint "fk_product_vendor_product_product_id" foreign key
+    (product_id) references production.product(product_id);
+alter table purchasing.product_vendor add
+    constraint "fk_product_vendor_unit_measure_unit_measure_code" foreign key
+    (unit_measure_code) references production.unit_measure(unit_measure_code);
+alter table purchasing.product_vendor add
+    constraint "fk_product_vendor_vendor_b_entity_id" foreign key
+    (business_entity_id) references purchasing.vendor(business_entity_id);
 
-ALTER TABLE Purchasing.PurchaseOrderDetail ADD
-    CONSTRAINT "FK_PurchaseOrderDetail_Product_ProductID" FOREIGN KEY
-    (ProductID) REFERENCES Production.Product(ProductID);
-ALTER TABLE Purchasing.PurchaseOrderDetail ADD
-    CONSTRAINT "FK_PurchaseOrderDetail_PurchaseOrderHeader_PurchaseOrderID" FOREIGN KEY
-    (PurchaseOrderID) REFERENCES Purchasing.PurchaseOrderHeader(PurchaseOrderID);
+alter table purchasing.purchase_order_detail add
+    constraint "fk_purchase_order_detail_product_product_id" foreign key
+    (product_id) references production.product(product_id);
+alter table purchasing.purchase_order_detail add
+    constraint "fk_purchase_order_detail_purchase_order_header_purch_order_id" foreign key
+    (purchase_order_id) references purchasing.purchase_order_header(purchase_order_id);
 
-ALTER TABLE Purchasing.PurchaseOrderHeader ADD
-    CONSTRAINT "FK_PurchaseOrderHeader_Employee_EmployeeID" FOREIGN KEY
-    (EmployeeID) REFERENCES HumanResources.Employee(BusinessEntityID);
-ALTER TABLE Purchasing.PurchaseOrderHeader ADD
-    CONSTRAINT "FK_PurchaseOrderHeader_Vendor_VendorID" FOREIGN KEY
-    (VendorID) REFERENCES Purchasing.Vendor(BusinessEntityID);
-ALTER TABLE Purchasing.PurchaseOrderHeader ADD
-    CONSTRAINT "FK_PurchaseOrderHeader_ShipMethod_ShipMethodID" FOREIGN KEY
-    (ShipMethodID) REFERENCES Purchasing.ShipMethod(ShipMethodID);
+alter table purchasing.purchase_order_header add
+    constraint "fk_purchase_order_header_employee_employee_id" foreign key
+    (employee_id) references human_resources.employee(business_entity_id);
+alter table purchasing.purchase_order_header add
+    constraint "fk_purchase_order_header_vendor_vendor_id" foreign key
+    (vendor_id) references purchasing.vendor(business_entity_id);
+alter table purchasing.purchase_order_header add
+    constraint "fk_purchase_order_header_ship_method_ship_method_id" foreign key
+    (ship_method_id) references purchasing.ship_method(ship_method_id);
 
-ALTER TABLE Sales.SalesOrderDetail ADD
-    CONSTRAINT "FK_SalesOrderDetail_SalesOrderHeader_SalesOrderID" FOREIGN KEY
-    (SalesOrderID) REFERENCES Sales.SalesOrderHeader(SalesOrderID) ON DELETE CASCADE;
-ALTER TABLE Sales.SalesOrderDetail ADD
-    CONSTRAINT "FK_SalesOrderDetail_SpecialOfferProduct_SpecialOfferIDProductID" FOREIGN KEY
-    (SpecialOfferID, ProductID) REFERENCES Sales.SpecialOfferProduct(SpecialOfferID, ProductID);
+alter table sales.sales_order_detail add
+    constraint "fk_sales_order_detail_sales_order_header_sales_order_id" foreign key
+    (sales_order_id) references sales.sales_order_header(sales_order_id) on delete cascade;
+alter table sales.sales_order_detail add
+    constraint "fk_sales_order_detail_special_offer_pr_special_offer_id_pr_id" foreign key
+    (special_offer_id, product_id) references sales.special_offer_product(special_offer_id, product_id);
 
-ALTER TABLE Sales.SalesOrderHeader ADD
-    CONSTRAINT "FK_SalesOrderHeader_Address_BillToAddressID" FOREIGN KEY
-    (BillToAddressID) REFERENCES Person.Address(AddressID);
-ALTER TABLE Sales.SalesOrderHeader ADD
-    CONSTRAINT "FK_SalesOrderHeader_Address_ShipToAddressID" FOREIGN KEY
-    (ShipToAddressID) REFERENCES Person.Address(AddressID);
-ALTER TABLE Sales.SalesOrderHeader ADD
-    CONSTRAINT "FK_SalesOrderHeader_CreditCard_CreditCardID" FOREIGN KEY
-    (CreditCardID) REFERENCES Sales.CreditCard(CreditCardID);
-ALTER TABLE Sales.SalesOrderHeader ADD
-    CONSTRAINT "FK_SalesOrderHeader_CurrencyRate_CurrencyRateID" FOREIGN KEY
-    (CurrencyRateID) REFERENCES Sales.CurrencyRate(CurrencyRateID);
-ALTER TABLE Sales.SalesOrderHeader ADD
-    CONSTRAINT "FK_SalesOrderHeader_Customer_CustomerID" FOREIGN KEY
-    (CustomerID) REFERENCES Sales.Customer(CustomerID);
-ALTER TABLE Sales.SalesOrderHeader ADD
-    CONSTRAINT "FK_SalesOrderHeader_SalesPerson_SalesPersonID" FOREIGN KEY
-    (SalesPersonID) REFERENCES Sales.SalesPerson(BusinessEntityID);
-ALTER TABLE Sales.SalesOrderHeader ADD
-    CONSTRAINT "FK_SalesOrderHeader_ShipMethod_ShipMethodID" FOREIGN KEY
-    (ShipMethodID) REFERENCES Purchasing.ShipMethod(ShipMethodID);
-ALTER TABLE Sales.SalesOrderHeader ADD
-    CONSTRAINT "FK_SalesOrderHeader_SalesTerritory_TerritoryID" FOREIGN KEY
-    (TerritoryID) REFERENCES Sales.SalesTerritory(TerritoryID);
+alter table sales.sales_order_header add
+    constraint "fk_sales_order_header_addr_bill_to_addr_id" foreign key
+    (bill_to_address_id) references person.address(address_id);
+alter table sales.sales_order_header add
+    constraint "fk_sales_order_header_addr_ship_to_addr_id" foreign key
+    (ship_to_address_id) references person.address(address_id);
+alter table sales.sales_order_header add
+    constraint "fk_sales_order_header_credit_card_credit_card_id" foreign key
+    (credit_card_id) references sales.credit_card(credit_card_id);
+alter table sales.sales_order_header add
+    constraint "fk_sales_order_header_currency_rate_currency_rate_id" foreign key
+    (currency_rate_id) references sales.currency_rate(currency_rate_id);
+alter table sales.sales_order_header add
+    constraint "fk_sales_order_header_customer_customer_id" foreign key
+    (customer_id) references sales.customer(customer_id);
+alter table sales.sales_order_header add
+    constraint "fk_sales_order_header_sales_person_sales_person_id" foreign key
+    (sales_person_id) references sales.sales_person(business_entity_id);
+alter table sales.sales_order_header add
+    constraint "fk_sales_order_header_ship_method_ship_method_id" foreign key
+    (ship_method_id) references purchasing.ship_method(ship_method_id);
+alter table sales.sales_order_header add
+    constraint "fk_sales_order_header_sales_territory_territory_id" foreign key
+    (territory_id) references sales.sales_territory(territory_id);
 
-ALTER TABLE Sales.SalesOrderHeaderSalesReason ADD
-    CONSTRAINT "FK_SalesOrderHeaderSalesReason_SalesReason_SalesReasonID" FOREIGN KEY
-    (SalesReasonID) REFERENCES Sales.SalesReason(SalesReasonID);
-ALTER TABLE Sales.SalesOrderHeaderSalesReason ADD
-    CONSTRAINT "FK_SalesOrderHeaderSalesReason_SalesOrderHeader_SalesOrderID" FOREIGN KEY
-    (SalesOrderID) REFERENCES Sales.SalesOrderHeader(SalesOrderID) ON DELETE CASCADE;
+alter table sales.sales_order_header_sales_reason add
+    constraint "fk_sales_order_header_sales_reason_sales_reason_id" foreign key
+    (sales_reason_id) references sales.sales_reason(sales_reason_id);
+alter table sales.sales_order_header_sales_reason add
+    constraint "fk_sales_order_header_sales_reason_sales_order_id" foreign key
+    (sales_order_id) references sales.sales_order_header(sales_order_id) on delete cascade;
 
-ALTER TABLE Sales.SalesPerson ADD
-    CONSTRAINT "FK_SalesPerson_Employee_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES HumanResources.Employee(BusinessEntityID);
-ALTER TABLE Sales.SalesPerson ADD
-    CONSTRAINT "FK_SalesPerson_SalesTerritory_TerritoryID" FOREIGN KEY
-    (TerritoryID) REFERENCES Sales.SalesTerritory(TerritoryID);
+alter table sales.sales_person add
+    constraint "fk_sales_person_employee_b_entity_id" foreign key
+    (business_entity_id) references human_resources.employee(business_entity_id);
+alter table sales.sales_person add
+    constraint "fk_sales_person_sales_territory_territory_id" foreign key
+    (territory_id) references sales.sales_territory(territory_id);
 
-ALTER TABLE Sales.SalesPersonQuotaHistory ADD
-    CONSTRAINT "FK_SalesPersonQuotaHistory_SalesPerson_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES Sales.SalesPerson(BusinessEntityID);
+alter table sales.sales_person_quota_history add
+    constraint "fk_sales_person_quota_history_sales_person_b_entity_id" foreign key
+    (business_entity_id) references sales.sales_person(business_entity_id);
 
-ALTER TABLE Sales.SalesTaxRate ADD
-    CONSTRAINT "FK_SalesTaxRate_StateProvince_StateProvinceID" FOREIGN KEY
-    (StateProvinceID) REFERENCES Person.StateProvince(StateProvinceID);
+alter table sales.sales_tax_rate add
+    constraint "fk_sales_tax_rate_state_province_state_province_id" foreign key
+    (state_province_id) references person.state_province(state_province_id);
 
-ALTER TABLE Sales.SalesTerritory ADD
-    CONSTRAINT "FK_SalesTerritory_CountryRegion_CountryRegionCode" FOREIGN KEY
-    (CountryRegionCode) REFERENCES Person.CountryRegion(CountryRegionCode);
+alter table sales.sales_territory add
+    constraint "fk_sales_territory_country_region_country_region_code" foreign key
+    (country_region_code) references person.country_region(country_region_code);
 
-ALTER TABLE Sales.SalesTerritoryHistory ADD
-    CONSTRAINT "FK_SalesTerritoryHistory_SalesPerson_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES Sales.SalesPerson(BusinessEntityID);
-ALTER TABLE Sales.SalesTerritoryHistory ADD
-    CONSTRAINT "FK_SalesTerritoryHistory_SalesTerritory_TerritoryID" FOREIGN KEY
-    (TerritoryID) REFERENCES Sales.SalesTerritory(TerritoryID);
+alter table sales.sales_territory_history add
+    constraint "fk_sales_territory_history_sales_person_b_entity_id" foreign key
+    (business_entity_id) references sales.sales_person(business_entity_id);
+alter table sales.sales_territory_history add
+    constraint "fk_sales_territory_history_sales_territory_territory_id" foreign key
+    (territory_id) references sales.sales_territory(territory_id);
 
-ALTER TABLE Sales.ShoppingCartItem ADD
-    CONSTRAINT "FK_ShoppingCartItem_Product_ProductID" FOREIGN KEY
-    (ProductID) REFERENCES Production.Product(ProductID);
+alter table sales.shopping_cart_item add
+    constraint "fk_shopping_cart_item_product_product_id" foreign key
+    (product_id) references production.product(product_id);
 
-ALTER TABLE Sales.SpecialOfferProduct ADD
-    CONSTRAINT "FK_SpecialOfferProduct_Product_ProductID" FOREIGN KEY
-    (ProductID) REFERENCES Production.Product(ProductID);
-ALTER TABLE Sales.SpecialOfferProduct ADD
-    CONSTRAINT "FK_SpecialOfferProduct_SpecialOffer_SpecialOfferID" FOREIGN KEY
-    (SpecialOfferID) REFERENCES Sales.SpecialOffer(SpecialOfferID);
+alter table sales.special_offer_product add
+    constraint "fk_special_offer_product_product_product_id" foreign key
+    (product_id) references production.product(product_id);
+alter table sales.special_offer_product add
+    constraint "fk_special_offer_product_special_offer_special_offer_id" foreign key
+    (special_offer_id) references sales.special_offer(special_offer_id);
 
-ALTER TABLE Person.StateProvince ADD
-    CONSTRAINT "FK_StateProvince_CountryRegion_CountryRegionCode" FOREIGN KEY
-    (CountryRegionCode) REFERENCES Person.CountryRegion(CountryRegionCode);
-ALTER TABLE Person.StateProvince ADD
-    CONSTRAINT "FK_StateProvince_SalesTerritory_TerritoryID" FOREIGN KEY
-    (TerritoryID) REFERENCES Sales.SalesTerritory(TerritoryID);
+alter table person.state_province add
+    constraint "fk_state_province_country_region_country_region_code" foreign key
+    (country_region_code) references person.country_region(country_region_code);
+alter table person.state_province add
+    constraint "fk_state_province_sales_territory_territory_id" foreign key
+    (territory_id) references sales.sales_territory(territory_id);
 
-ALTER TABLE Sales.Store ADD
-    CONSTRAINT "FK_Store_BusinessEntity_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES Person.BusinessEntity(BusinessEntityID);
-ALTER TABLE Sales.Store ADD
-    CONSTRAINT "FK_Store_SalesPerson_SalesPersonID" FOREIGN KEY
-    (SalesPersonID) REFERENCES Sales.SalesPerson(BusinessEntityID);
+alter table sales.store add
+    constraint "fk_store_b_entity_b_entity_id" foreign key
+    (business_entity_id) references person.business_entity(business_entity_id);
+alter table sales.store add
+    constraint "fk_store_sales_person_sales_person_id" foreign key
+    (sales_person_id) references sales.sales_person(business_entity_id);
 
-ALTER TABLE Production.TransactionHistory ADD
-    CONSTRAINT "FK_TransactionHistory_Product_ProductID" FOREIGN KEY
-    (ProductID) REFERENCES Production.Product(ProductID);
+alter table production.transaction_history add
+    constraint "fk_transaction_history_product_product_id" foreign key
+    (product_id) references production.product(product_id);
 
-ALTER TABLE Purchasing.Vendor ADD
-    CONSTRAINT "FK_Vendor_BusinessEntity_BusinessEntityID" FOREIGN KEY
-    (BusinessEntityID) REFERENCES Person.BusinessEntity(BusinessEntityID);
+alter table purchasing.vendor add
+    constraint "fk_vendor_b_entity_b_entity_id" foreign key
+    (business_entity_id) references person.business_entity(business_entity_id);
 
-ALTER TABLE Production.WorkOrder ADD
-    CONSTRAINT "FK_WorkOrder_Product_ProductID" FOREIGN KEY
-    (ProductID) REFERENCES Production.Product(ProductID);
-ALTER TABLE Production.WorkOrder ADD
-    CONSTRAINT "FK_WorkOrder_ScrapReason_ScrapReasonID" FOREIGN KEY
-    (ScrapReasonID) REFERENCES Production.ScrapReason(ScrapReasonID);
+alter table production.work_order add
+    constraint "fk_work_order_product_product_id" foreign key
+    (product_id) references production.product(product_id);
+alter table production.work_order add
+    constraint "fk_work_order_scrap_reason_scrap_reason_id" foreign key
+    (scrap_reason_id) references production.scrap_reason(scrap_reason_id);
 
-ALTER TABLE Production.WorkOrderRouting ADD
-    CONSTRAINT "FK_WorkOrderRouting_Location_LocationID" FOREIGN KEY
-    (LocationID) REFERENCES Production.Location(LocationID);
-ALTER TABLE Production.WorkOrderRouting ADD
-    CONSTRAINT "FK_WorkOrderRouting_WorkOrder_WorkOrderID" FOREIGN KEY
-    (WorkOrderID) REFERENCES Production.WorkOrder(WorkOrderID);
+alter table production.work_order_routing add
+    constraint "fk_work_order_routing_location_location_id" foreign key
+    (location_id) references production.location(location_id);
+alter table production.work_order_routing add
+    constraint "fk_work_order_routing_work_order_work_order_id" foreign key
+    (work_order_id) references production.work_order(work_order_id);
 
 
 
@@ -2513,247 +2512,247 @@ ALTER TABLE Production.WorkOrderRouting ADD
 
 -- And now the Postgres version, which is a little more trim:
 
-CREATE VIEW Person.vAdditionalContactInfo
-AS
-SELECT
-    p.BusinessEntityID
-    ,p.FirstName
-    ,p.MiddleName
-    ,p.LastName
+create view person.v_additional_contact_info
+as
+select
+    p.business_entity_id
+    ,p.first_name
+    ,p.middle_name
+    ,p.last_name
     ,(xpath('(act:telephoneNumber)[1]/act:number/text()',                node, '{{act,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ContactTypes}}'))[1]
-               AS TelephoneNumber
+               AS telephone_number
     ,BTRIM(
      (xpath('(act:telephoneNumber)[1]/act:SpecialInstructions/text()',   node, '{{act,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ContactTypes}}'))[1]::VARCHAR)
-               AS TelephoneSpecialInstructions
+               AS telephone_special_instructions
     ,(xpath('(act:homePostalAddress)[1]/act:Street/text()',              node, '{{act,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ContactTypes}}'))[1]
-               AS Street
+               AS street
     ,(xpath('(act:homePostalAddress)[1]/act:City/text()',                node, '{{act,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ContactTypes}}'))[1]
-               AS City
+               AS city
     ,(xpath('(act:homePostalAddress)[1]/act:StateProvince/text()',       node, '{{act,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ContactTypes}}'))[1]
-               AS StateProvince
+               AS state_province
     ,(xpath('(act:homePostalAddress)[1]/act:PostalCode/text()',          node, '{{act,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ContactTypes}}'))[1]
-               AS PostalCode
+               AS postal_code
     ,(xpath('(act:homePostalAddress)[1]/act:CountryRegion/text()',       node, '{{act,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ContactTypes}}'))[1]
-               AS CountryRegion
+               AS country_region
     ,(xpath('(act:homePostalAddress)[1]/act:SpecialInstructions/text()', node, '{{act,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ContactTypes}}'))[1]
-               AS HomeAddressSpecialInstructions
+               AS home_address_special_instructions
     ,(xpath('(act:eMail)[1]/act:eMailAddress/text()',                    node, '{{act,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ContactTypes}}'))[1]
-               AS EMailAddress
+               AS e_mail_address
     ,BTRIM(
      (xpath('(act:eMail)[1]/act:SpecialInstructions/text()',             node, '{{act,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ContactTypes}}'))[1]::VARCHAR)
-               AS EMailSpecialInstructions
+               AS e_mail_special_instructions
     ,(xpath('((act:eMail)[1]/act:SpecialInstructions/act:telephoneNumber)[1]/act:number/text()', node, '{{act,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ContactTypes}}'))[1]
-               AS EMailTelephoneNumber
+               AS e_mail_telephone_number
     ,p.rowguid
-    ,p.ModifiedDate
-FROM Person.Person AS p
-  LEFT OUTER JOIN
-    (SELECT
-      BusinessEntityID
-      ,UNNEST(xpath('/ci:AdditionalContactInfo',
-        additionalcontactinfo,
-        '{{ci,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ContactInfo}}')) AS node
-    FROM Person.Person
-    WHERE AdditionalContactInfo IS NOT NULL) AS additional
-  ON p.BusinessEntityID = additional.BusinessEntityID;
+    ,p.modified_date
+from person.person as p
+  left outer join
+    (select
+      business_entity_id
+      ,unnest(xpath('/ci:AdditionalContactInfo',
+        additional_contact_info,
+        '{{ci,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ContactInfo}}')) as node
+    from person.person
+    where additional_contact_info is not null) as additional
+  on p.business_entity_id = additional.business_entity_id;
 
 
-CREATE VIEW HumanResources.vEmployee
-AS
-SELECT
-    e.BusinessEntityID
-    ,p.Title
-    ,p.FirstName
-    ,p.MiddleName
-    ,p.LastName
-    ,p.Suffix
-    ,e.JobTitle 
-    ,pp.PhoneNumber
-    ,pnt.Name AS PhoneNumberType
-    ,ea.EmailAddress
-    ,p.EmailPromotion
-    ,a.AddressLine1
-    ,a.AddressLine2
-    ,a.City
-    ,sp.Name AS StateProvinceName
-    ,a.PostalCode
-    ,cr.Name AS CountryRegionName
-    ,p.AdditionalContactInfo
-FROM HumanResources.Employee e
-  INNER JOIN Person.Person p
-    ON p.BusinessEntityID = e.BusinessEntityID
-  INNER JOIN Person.BusinessEntityAddress bea
-    ON bea.BusinessEntityID = e.BusinessEntityID
-  INNER JOIN Person.Address a
-    ON a.AddressID = bea.AddressID
-  INNER JOIN Person.StateProvince sp
-    ON sp.StateProvinceID = a.StateProvinceID
-  INNER JOIN Person.CountryRegion cr
-    ON cr.CountryRegionCode = sp.CountryRegionCode
-  LEFT OUTER JOIN Person.PersonPhone pp
-    ON pp.BusinessEntityID = p.BusinessEntityID
-  LEFT OUTER JOIN Person.PhoneNumberType pnt
-    ON pp.PhoneNumberTypeID = pnt.PhoneNumberTypeID
-  LEFT OUTER JOIN Person.EmailAddress ea
-    ON p.BusinessEntityID = ea.BusinessEntityID;
+create view human_resources.v_employee
+as
+select
+    e.business_entity_id
+    ,p.title
+    ,p.first_name
+    ,p.middle_name
+    ,p.last_name
+    ,p.suffix
+    ,e.job_title 
+    ,pp.phone_number
+    ,pnt.name as phone_number_type
+    ,ea.email_address
+    ,p.email_promotion
+    ,a.address_line1
+    ,a.address_line2
+    ,a.city
+    ,sp.name as state_province_name
+    ,a.postal_code
+    ,cr.name as country_region_name
+    ,p.additional_contact_info
+from human_resources.employee e
+  inner join person.person p
+    on p.business_entity_id = e.business_entity_id
+  inner join person.business_entity_address bea
+    on bea.business_entity_id = e.business_entity_id
+  inner join person.address a
+    on a.address_id = bea.address_id
+  inner join person.state_province sp
+    on sp.state_province_id = a.state_province_id
+  inner join person.country_region cr
+    on cr.country_region_code = sp.country_region_code
+  left outer join person.person_phone pp
+    on pp.business_entity_id = p.business_entity_id
+  left outer join person.phone_number_type pnt
+    on pp.phone_number_type_id = pnt.phone_number_type_id
+  left outer join person.email_address ea
+    on p.business_entity_id = ea.business_entity_id;
 
 
-CREATE VIEW HumanResources.vEmployeeDepartment
-AS
-SELECT
-    e.BusinessEntityID
-    ,p.Title
-    ,p.FirstName
-    ,p.MiddleName
-    ,p.LastName
-    ,p.Suffix
-    ,e.JobTitle
-    ,d.Name AS Department
-    ,d.GroupName
-    ,edh.StartDate
-FROM HumanResources.Employee e
-  INNER JOIN Person.Person p
-    ON p.BusinessEntityID = e.BusinessEntityID
-  INNER JOIN HumanResources.EmployeeDepartmentHistory edh
-    ON e.BusinessEntityID = edh.BusinessEntityID
-  INNER JOIN HumanResources.Department d
-    ON edh.DepartmentID = d.DepartmentID
-WHERE edh.EndDate IS NULL;
+create view human_resources.v_employee_department
+as
+select
+    e.business_entity_id
+    ,p.title
+    ,p.first_name
+    ,p.middle_name
+    ,p.last_name
+    ,p.suffix
+    ,e.job_title
+    ,d.name as department
+    ,d.group_name
+    ,edh.start_date
+from human_resources.employee e
+  inner join person.person p
+    on p.business_entity_id = e.business_entity_id
+  inner join human_resources.employee_department_history edh
+    on e.business_entity_id = edh.business_entity_id
+  inner join human_resources.department d
+    on edh.department_id = d.department_id
+where edh.end_date is null;
 
 
-CREATE VIEW HumanResources.vEmployeeDepartmentHistory
-AS
-SELECT
-    e.BusinessEntityID
-    ,p.Title
-    ,p.FirstName
-    ,p.MiddleName
-    ,p.LastName
-    ,p.Suffix
-    ,s.Name AS Shift
-    ,d.Name AS Department
-    ,d.GroupName
-    ,edh.StartDate
-    ,edh.EndDate
-FROM HumanResources.Employee e
-  INNER JOIN Person.Person p
-    ON p.BusinessEntityID = e.BusinessEntityID
-  INNER JOIN HumanResources.EmployeeDepartmentHistory edh
-    ON e.BusinessEntityID = edh.BusinessEntityID
-  INNER JOIN HumanResources.Department d
-    ON edh.DepartmentID = d.DepartmentID
-  INNER JOIN HumanResources.Shift s
-    ON s.ShiftID = edh.ShiftID;
+create view human_resources.v_employee_department_history
+as
+select
+    e.business_entity_id
+    ,p.title
+    ,p.first_name
+    ,p.middle_name
+    ,p.last_name
+    ,p.suffix
+    ,s.name as shift
+    ,d.name as department
+    ,d.group_name
+    ,edh.start_date
+    ,edh.end_date
+from human_resources.employee e
+  inner join person.person p
+    on p.business_entity_id = e.business_entity_id
+  inner join human_resources.employee_department_history edh
+    on e.business_entity_id = edh.business_entity_id
+  inner join human_resources.department d
+    on edh.department_id = d.department_id
+  inner join human_resources.shift s
+    on s.shift_id = edh.shift_id;
 
 
-CREATE VIEW Sales.vIndividualCustomer
-AS
-SELECT
-    p.BusinessEntityID
-    ,p.Title
-    ,p.FirstName
-    ,p.MiddleName
-    ,p.LastName
-    ,p.Suffix
-    ,pp.PhoneNumber
-    ,pnt.Name AS PhoneNumberType
-    ,ea.EmailAddress
-    ,p.EmailPromotion
-    ,at.Name AS AddressType
-    ,a.AddressLine1
-    ,a.AddressLine2
-    ,a.City
-    ,sp.Name AS StateProvinceName
-    ,a.PostalCode
-    ,cr.Name AS CountryRegionName
-    ,p.Demographics
-FROM Person.Person p
-  INNER JOIN Person.BusinessEntityAddress bea
-    ON bea.BusinessEntityID = p.BusinessEntityID
-  INNER JOIN Person.Address a
-    ON a.AddressID = bea.AddressID
-  INNER JOIN Person.StateProvince sp
-    ON sp.StateProvinceID = a.StateProvinceID
-  INNER JOIN Person.CountryRegion cr
-    ON cr.CountryRegionCode = sp.CountryRegionCode
-  INNER JOIN Person.AddressType at
-    ON at.AddressTypeID = bea.AddressTypeID
-  INNER JOIN Sales.Customer c
-    ON c.PersonID = p.BusinessEntityID
-  LEFT OUTER JOIN Person.EmailAddress ea
-    ON ea.BusinessEntityID = p.BusinessEntityID
-  LEFT OUTER JOIN Person.PersonPhone pp
-    ON pp.BusinessEntityID = p.BusinessEntityID
-  LEFT OUTER JOIN Person.PhoneNumberType pnt
-    ON pnt.PhoneNumberTypeID = pp.PhoneNumberTypeID
-WHERE c.StoreID IS NULL;
+create view sales.v_individual_customer
+as
+select
+    p.business_entity_id
+    ,p.title
+    ,p.first_name
+    ,p.middle_name
+    ,p.last_name
+    ,p.suffix
+    ,pp.phone_number
+    ,pnt.name as phone_number_type
+    ,ea.email_address
+    ,p.email_promotion
+    ,at.name as address_type
+    ,a.address_line1
+    ,a.address_line2
+    ,a.city
+    ,sp.name as state_province_name
+    ,a.postal_code
+    ,cr.name as country_region_name
+    ,p.demographics
+from person.person p
+  inner join person.business_entity_address bea
+    on bea.business_entity_id = p.business_entity_id
+  inner join person.address a
+    on a.address_id = bea.address_id
+  inner join person.state_province sp
+    on sp.state_province_id = a.state_province_id
+  inner join person.country_region cr
+    on cr.country_region_code = sp.country_region_code
+  inner join person.address_type at
+    on at.address_type_id = bea.address_type_id
+  inner join sales.customer c
+    on c.person_id = p.business_entity_id
+  left outer join person.email_address ea
+    on ea.business_entity_id = p.business_entity_id
+  left outer join person.person_phone pp
+    on pp.business_entity_id = p.business_entity_id
+  left outer join person.phone_number_type pnt
+    on pnt.phone_number_type_id = pp.phone_number_type_id
+where c.store_id is null;
 
 
-CREATE VIEW Sales.vPersonDemographics
-AS
-SELECT
-    BusinessEntityID
-    ,CAST((xpath('n:TotalPurchaseYTD/text()', Demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR AS money)
-            AS TotalPurchaseYTD
-    ,CAST((xpath('n:DateFirstPurchase/text()', Demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR AS DATE)
-            AS DateFirstPurchase
-    ,CAST((xpath('n:BirthDate/text()', Demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR AS DATE)
-            AS BirthDate
-    ,(xpath('n:MaritalStatus/text()', Demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR(1)
-            AS MaritalStatus
-    ,(xpath('n:YearlyIncome/text()', Demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR(30)
-            AS YearlyIncome
-    ,(xpath('n:Gender/text()', Demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR(1)
-            AS Gender
-    ,CAST((xpath('n:TotalChildren/text()', Demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR AS INTEGER)
-            AS TotalChildren
-    ,CAST((xpath('n:NumberChildrenAtHome/text()', Demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR AS INTEGER)
-            AS NumberChildrenAtHome
-    ,(xpath('n:Education/text()', Demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR(30)
-            AS Education
-    ,(xpath('n:Occupation/text()', Demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR(30)
-            AS Occupation
-    ,CAST((xpath('n:HomeOwnerFlag/text()', Demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR AS BOOLEAN)
-            AS HomeOwnerFlag
-    ,CAST((xpath('n:NumberCarsOwned/text()', Demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR AS INTEGER)
-            AS NumberCarsOwned
-FROM Person.Person
-  WHERE Demographics IS NOT NULL;
+create view sales.v_person_demographics
+as
+select
+    business_entity_id
+    ,CAST((xpath('n:TotalPurchaseYTD/text()', demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR AS money)
+            AS total_purchase_ytd
+    ,CAST((xpath('n:DateFirstPurchase/text()', demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR AS DATE)
+            AS date_first_purchase
+    ,CAST((xpath('n:BirthDate/text()', demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR AS DATE)
+            AS birth_date
+    ,(xpath('n:MaritalStatus/text()', demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR(1)
+            AS marital_status
+    ,(xpath('n:YearlyIncome/text()', demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR(30)
+            AS yearly_income
+    ,(xpath('n:Gender/text()', demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR(1)
+            AS gender
+    ,CAST((xpath('n:TotalChildren/text()', demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR AS INTEGER)
+            AS total_children
+    ,CAST((xpath('n:NumberChildrenAtHome/text()', demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR AS INTEGER)
+            AS number_children_at_home
+    ,(xpath('n:Education/text()', demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR(30)
+            AS education
+    ,(xpath('n:Occupation/text()', demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR(30)
+            AS occupation
+    ,CAST((xpath('n:HomeOwnerFlag/text()', demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR AS BOOLEAN)
+            AS home_owner_flag
+    ,CAST((xpath('n:NumberCarsOwned/text()', demographics, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/IndividualSurvey}}'))[1]::VARCHAR AS INTEGER)
+            AS number_cars_owned
+from person.person
+  where demographics is not null;
 
 
-CREATE VIEW HumanResources.vJobCandidate
-AS
-SELECT
-    JobCandidateID
-    ,BusinessEntityID
-    ,(xpath('/n:Resume/n:Name/n:Name.Prefix/text()', Resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(30)
-                   AS "Name.Prefix"
-    ,(xpath('/n:Resume/n:Name/n:Name.First/text()', Resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(30)
-                   AS "Name.First"
-    ,(xpath('/n:Resume/n:Name/n:Name.Middle/text()', Resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(30)
-                   AS "Name.Middle"
-    ,(xpath('/n:Resume/n:Name/n:Name.Last/text()', Resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(30)
-                   AS "Name.Last"
-    ,(xpath('/n:Resume/n:Name/n:Name.Suffix/text()', Resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(30)
-                   AS "Name.Suffix"
-    ,(xpath('/n:Resume/n:Skills/text()', Resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar
-                   AS "Skills"
-    ,(xpath('n:Address/n:Addr.Type/text()', Resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(30)
-                   AS "Addr.Type"
-    ,(xpath('n:Address/n:Addr.Location/n:Location/n:Loc.CountryRegion/text()', Resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(100)
-                   AS "Addr.Loc.CountryRegion"
-    ,(xpath('n:Address/n:Addr.Location/n:Location/n:Loc.State/text()', Resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(100)
-                   AS "Addr.Loc.State"
-    ,(xpath('n:Address/n:Addr.Location/n:Location/n:Loc.City/text()', Resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(100)
-                   AS "Addr.Loc.City"
-    ,(xpath('n:Address/n:Addr.PostalCode/text()', Resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(20)
-                   AS "Addr.PostalCode"
-    ,(xpath('/n:Resume/n:EMail/text()', Resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar
-                   AS "EMail"
-    ,(xpath('/n:Resume/n:WebSite/text()', Resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar
-                   AS "WebSite"
-    ,ModifiedDate
-FROM HumanResources.JobCandidate;
+create view human_resources.v_job_candidate
+as
+select
+    job_candidate_id
+    ,business_entity_id
+    ,(xpath('/n:Resume/n:Name/n:Name.Prefix/text()', resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(30)
+                   AS "name.prefix"
+    ,(xpath('/n:Resume/n:Name/n:Name.First/text()', resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(30)
+                   AS "name.first"
+    ,(xpath('/n:Resume/n:Name/n:Name.Middle/text()', resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(30)
+                   AS "name.middle"
+    ,(xpath('/n:Resume/n:Name/n:Name.Last/text()', resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(30)
+                   AS "name.last"
+    ,(xpath('/n:Resume/n:Name/n:Name.Suffix/text()', resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(30)
+                   AS "name.suffix"
+    ,(xpath('/n:Resume/n:Skills/text()', resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar
+                   AS "skills"
+    ,(xpath('n:Address/n:Addr.Type/text()', resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(30)
+                   AS "addr.type"
+    ,(xpath('n:Address/n:Addr.Location/n:Location/n:Loc.CountryRegion/text()', resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(100)
+                   AS "addr.loc.country_region"
+    ,(xpath('n:Address/n:Addr.Location/n:Location/n:Loc.State/text()', resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(100)
+                   AS "addr.loc.state"
+    ,(xpath('n:Address/n:Addr.Location/n:Location/n:Loc.City/text()', resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(100)
+                   AS "addr.loc.city"
+    ,(xpath('n:Address/n:Addr.PostalCode/text()', resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar(20)
+                   AS "addr.postal_code"
+    ,(xpath('/n:Resume/n:EMail/text()', resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar
+                   AS "e_mail"
+    ,(xpath('/n:Resume/n:WebSite/text()', resume, '{{n,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))[1]::varchar
+                   AS "web_site"
+    ,modified_date
+from human_resources.job_candidate;
 
 
 -- In this case we UNNEST in order to have multiple previous employments listed for
@@ -2763,31 +2762,31 @@ FROM HumanResources.JobCandidate;
 -- Emp.FunctionCategory is not there, then there will be 0 rows returned.  Each
 -- Employment element must contain all 10 sub-elements for this approach to work.
 -- (See the Education example below for a better alternate approach!)
-CREATE VIEW HumanResources.vJobCandidateEmployment
-AS
-SELECT
-    JobCandidateID
-    ,CAST(UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.StartDate/text()', Resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::VARCHAR(20) AS DATE)
-                                                AS "Emp.StartDate"
-    ,CAST(UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.EndDate/text()', Resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::VARCHAR(20) AS DATE)
-                                                AS "Emp.EndDate"
-    ,UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.OrgName/text()', Resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::varchar(100)
-                                                AS "Emp.OrgName"
-    ,UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.JobTitle/text()', Resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::varchar(100)
-                                                AS "Emp.JobTitle"
-    ,UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.Responsibility/text()', Resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::varchar
-                                                AS "Emp.Responsibility"
-    ,UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.FunctionCategory/text()', Resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::varchar
-                                                AS "Emp.FunctionCategory"
-    ,UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.IndustryCategory/text()', Resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::varchar
-                                                AS "Emp.IndustryCategory"
-    ,UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.Location/ns:Location/ns:Loc.CountryRegion/text()', Resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::varchar
-                                                AS "Emp.Loc.CountryRegion"
-    ,UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.Location/ns:Location/ns:Loc.State/text()', Resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::varchar
-                                                AS "Emp.Loc.State"
-    ,UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.Location/ns:Location/ns:Loc.City/text()', Resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::varchar
-                                                AS "Emp.Loc.City"
-  FROM HumanResources.JobCandidate;
+create view human_resources.v_job_candidate_employment
+as
+select
+    job_candidate_id
+    ,CAST(UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.StartDate/text()', resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::VARCHAR(20) AS DATE)
+                                                AS "emp.start_date"
+    ,CAST(UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.EndDate/text()', resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::VARCHAR(20) AS DATE)
+                                                AS "emp.end_date"
+    ,UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.OrgName/text()', resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::varchar(100)
+                                                AS "emp.org_name"
+    ,UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.JobTitle/text()', resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::varchar(100)
+                                                AS "emp.job_title"
+    ,UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.Responsibility/text()', resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::varchar
+                                                AS "emp.responsibility"
+    ,UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.FunctionCategory/text()', resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::varchar
+                                                AS "emp.function_category"
+    ,UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.IndustryCategory/text()', resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::varchar
+                                                AS "emp.industry_category"
+    ,UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.Location/ns:Location/ns:Loc.CountryRegion/text()', resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::varchar
+                                                AS "emp.loc.country_region"
+    ,UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.Location/ns:Location/ns:Loc.State/text()', resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::varchar
+                                                AS "emp.loc.state"
+    ,UNNEST(xpath('/ns:Resume/ns:Employment/ns:Emp.Location/ns:Location/ns:Loc.City/text()', resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}'))::varchar
+                                                AS "emp.loc.city"
+  from human_resources.job_candidate;
 
 
 -- In this data set, not every listed education has a minor.  (OK, actually NONE of them do!)
@@ -2795,234 +2794,234 @@ SELECT
 -- we just UNNEST once in a derived table, then convert each XML fragment into a document again
 -- with one <root> element and a shorter namespace for ns:, and finally just use xpath on
 -- all the created documents.
-CREATE VIEW HumanResources.vJobCandidateEducation
-AS
-SELECT
-  jc.JobCandidateID
+create view human_resources.v_job_candidate_education
+as
+select
+  jc.job_candidate_id
   ,(xpath('/root/ns:Education/ns:Edu.Level/text()', jc.doc, '{{ns,http://adventureworks.com}}'))[1]::varchar(50)
-                             AS "Edu.Level"
+                             AS "edu.level"
   ,CAST((xpath('/root/ns:Education/ns:Edu.StartDate/text()', jc.doc, '{{ns,http://adventureworks.com}}'))[1]::VARCHAR(20) AS DATE)
-                             AS "Edu.StartDate"
+                             AS "edu.start_date"
   ,CAST((xpath('/root/ns:Education/ns:Edu.EndDate/text()', jc.doc, '{{ns,http://adventureworks.com}}'))[1]::VARCHAR(20) AS DATE)
-                             AS "Edu.EndDate"
+                             AS "edu.end_date"
   ,(xpath('/root/ns:Education/ns:Edu.Degree/text()', jc.doc, '{{ns,http://adventureworks.com}}'))[1]::varchar(50)
-                             AS "Edu.Degree"
+                             AS "edu.degree"
   ,(xpath('/root/ns:Education/ns:Edu.Major/text()', jc.doc, '{{ns,http://adventureworks.com}}'))[1]::varchar(50)
-                             AS "Edu.Major"
+                             AS "edu.major"
   ,(xpath('/root/ns:Education/ns:Edu.Minor/text()', jc.doc, '{{ns,http://adventureworks.com}}'))[1]::varchar(50)
-                             AS "Edu.Minor"
+                             AS "edu.minor"
   ,(xpath('/root/ns:Education/ns:Edu.GPA/text()', jc.doc, '{{ns,http://adventureworks.com}}'))[1]::varchar(5)
-                             AS "Edu.GPA"
+                             AS "edu.gpa"
   ,(xpath('/root/ns:Education/ns:Edu.GPAScale/text()', jc.doc, '{{ns,http://adventureworks.com}}'))[1]::varchar(5)
-                             AS "Edu.GPAScale"
+                             AS "edu.gpa_scale"
   ,(xpath('/root/ns:Education/ns:Edu.School/text()', jc.doc, '{{ns,http://adventureworks.com}}'))[1]::varchar(100)
-                             AS "Edu.School"
+                             AS "edu.school"
   ,(xpath('/root/ns:Education/ns:Edu.Location/ns:Location/ns:Loc.CountryRegion/text()', jc.doc, '{{ns,http://adventureworks.com}}'))[1]::varchar(100)
-                             AS "Edu.Loc.CountryRegion"
+                             AS "edu.loc.country_region"
   ,(xpath('/root/ns:Education/ns:Edu.Location/ns:Location/ns:Loc.State/text()', jc.doc, '{{ns,http://adventureworks.com}}'))[1]::varchar(100)
-                             AS "Edu.Loc.State"
+                             AS "edu.loc.state"
   ,(xpath('/root/ns:Education/ns:Edu.Location/ns:Location/ns:Loc.City/text()', jc.doc, '{{ns,http://adventureworks.com}}'))[1]::varchar(100)
-                             AS "Edu.Loc.City"
-FROM (SELECT JobCandidateID
-    -- Because the underlying XML data used in this example has namespaces defined at the document level,
-    -- when we take individual fragments using UNNEST then each fragment has no idea of the namespaces.
-    -- So here each fragment gets turned back into its own document with a root element that defines a
+                             AS "edu.loc.city"
+from (select job_candidate_id
+    -- because the underlying xml data used in this example has namespaces defined at the document level,
+    -- when we take individual fragments using unnest then each fragment has no idea of the namespaces.
+    -- so here each fragment gets turned back into its own document with a root element that defines a
     -- simpler thing for "ns" since this will only be used only in the xpath queries above.
     ,('<root xmlns:ns="http://adventureworks.com">' ||
-      unnesting.Education::varchar ||
-      '</root>')::xml AS doc
-  FROM (SELECT JobCandidateID
-      ,UNNEST(xpath('/ns:Resume/ns:Education', Resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}')) AS Education
-    FROM HumanResources.JobCandidate) AS unnesting) AS jc;
+      unnesting.education::varchar ||
+      '</root>')::xml as doc
+  from (select job_candidate_id
+      ,UNNEST(xpath('/ns:Resume/ns:Education', resume, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/Resume}}')) AS Education
+    from human_resources.job_candidate) as unnesting) as jc;
 
 
 -- Products and product descriptions by language.
 -- We're making this a materialized view so that performance can be better.
-CREATE MATERIALIZED VIEW Production.vProductAndDescription
-AS
-SELECT
-    p.ProductID
-    ,p.Name
-    ,pm.Name AS ProductModel
-    ,pmx.CultureID
-    ,pd.Description
-FROM Production.Product p
-    INNER JOIN Production.ProductModel pm
-    ON p.ProductModelID = pm.ProductModelID
-    INNER JOIN Production.ProductModelProductDescriptionCulture pmx
-    ON pm.ProductModelID = pmx.ProductModelID
-    INNER JOIN Production.ProductDescription pd
-    ON pmx.ProductDescriptionID = pd.ProductDescriptionID;
+create materialized view production.v_product_and_description
+as
+select
+    p.product_id
+    ,p.name
+    ,pm.name as product_model
+    ,pmx.culture_id
+    ,pd.description
+from production.product p
+    inner join production.product_model pm
+    on p.product_model_id = pm.product_model_id
+    inner join production.product_model_product_description_culture pmx
+    on pm.product_model_id = pmx.product_model_id
+    inner join production.product_description pd
+    on pmx.product_description_id = pd.product_description_id;
 
 -- Index the vProductAndDescription view
-CREATE UNIQUE INDEX IX_vProductAndDescription ON Production.vProductAndDescription(CultureID, ProductID);
-CLUSTER Production.vProductAndDescription USING IX_vProductAndDescription;
+create unique index ix_v_product_and_description on production.v_product_and_description(culture_id, product_id);
+cluster production.v_product_and_description using ix_v_product_and_description;
 -- Note that with a materialized view, changes to the underlying tables will
 -- not change the contents of the view.  In order to maintain the index, if there
 -- are changes to any of the 4 tables then you would need to run:
 --   REFRESH MATERIALIZED VIEW Production.vProductAndDescription;
 
 
-CREATE VIEW Production.vProductModelCatalogDescription
-AS
-SELECT
-  ProductModelID
-  ,Name
-  ,(xpath('/p1:ProductDescription/p1:Summary/html:p/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{html,http://www.w3.org/1999/xhtml}}'))[1]::varchar
-                                 AS "Summary"
-  ,(xpath('/p1:ProductDescription/p1:Manufacturer/p1:Name/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar
-                                  AS Manufacturer
-  ,(xpath('/p1:ProductDescription/p1:Manufacturer/p1:Copyright/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(30)
-                                                  AS Copyright
-  ,(xpath('/p1:ProductDescription/p1:Manufacturer/p1:ProductURL/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(256)
-                                                  AS ProductURL
-  ,(xpath('/p1:ProductDescription/p1:Features/wm:Warranty/wm:WarrantyPeriod/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wm,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelWarrAndMain}}' ))[1]::varchar(256)
-                                                          AS WarrantyPeriod
-  ,(xpath('/p1:ProductDescription/p1:Features/wm:Warranty/wm:Description/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wm,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelWarrAndMain}}' ))[1]::varchar(256)
-                                                          AS WarrantyDescription
-  ,(xpath('/p1:ProductDescription/p1:Features/wm:Maintenance/wm:NoOfYears/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wm,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelWarrAndMain}}' ))[1]::varchar(256)
-                                                             AS NoOfYears
-  ,(xpath('/p1:ProductDescription/p1:Features/wm:Maintenance/wm:Description/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wm,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelWarrAndMain}}' ))[1]::varchar(256)
-                                                             AS MaintenanceDescription
-  ,(xpath('/p1:ProductDescription/p1:Features/wf:wheel/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wf,http://www.adventure-works.com/schemas/OtherFeatures}}'))[1]::varchar(256)
-                                              AS Wheel
-  ,(xpath('/p1:ProductDescription/p1:Features/wf:saddle/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wf,http://www.adventure-works.com/schemas/OtherFeatures}}'))[1]::varchar(256)
-                                              AS Saddle
-  ,(xpath('/p1:ProductDescription/p1:Features/wf:pedal/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wf,http://www.adventure-works.com/schemas/OtherFeatures}}'))[1]::varchar(256)
-                                              AS Pedal
-  ,(xpath('/p1:ProductDescription/p1:Features/wf:BikeFrame/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wf,http://www.adventure-works.com/schemas/OtherFeatures}}'))[1]::varchar
-                                              AS BikeFrame
-  ,(xpath('/p1:ProductDescription/p1:Features/wf:crankset/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wf,http://www.adventure-works.com/schemas/OtherFeatures}}'))[1]::varchar(256)
-                                              AS Crankset
-  ,(xpath('/p1:ProductDescription/p1:Picture/p1:Angle/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(256)
-                                             AS PictureAngle
-  ,(xpath('/p1:ProductDescription/p1:Picture/p1:Size/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(256)
-                                             AS PictureSize
-  ,(xpath('/p1:ProductDescription/p1:Picture/p1:ProductPhotoID/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(256)
-                                             AS ProductPhotoID
-  ,(xpath('/p1:ProductDescription/p1:Specifications/Material/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(256)
-                                                 AS Material
-  ,(xpath('/p1:ProductDescription/p1:Specifications/Color/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(256)
-                                                 AS Color
-  ,(xpath('/p1:ProductDescription/p1:Specifications/ProductLine/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(256)
-                                                 AS ProductLine
-  ,(xpath('/p1:ProductDescription/p1:Specifications/Style/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(256)
-                                                 AS Style
-  ,(xpath('/p1:ProductDescription/p1:Specifications/RiderExperience/text()', CatalogDescription, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(1024)
-                                                 AS RiderExperience
+create view production.v_product_model_catalog_description
+as
+select
+  product_model_id
+  ,name
+  ,(xpath('/p1:ProductDescription/p1:Summary/html:p/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{html,http://www.w3.org/1999/xhtml}}'))[1]::varchar
+                                 AS "summary"
+  ,(xpath('/p1:ProductDescription/p1:Manufacturer/p1:Name/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar
+                                  AS manufacturer
+  ,(xpath('/p1:ProductDescription/p1:Manufacturer/p1:Copyright/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(30)
+                                                  AS copyright
+  ,(xpath('/p1:ProductDescription/p1:Manufacturer/p1:ProductURL/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(256)
+                                                  AS product_url
+  ,(xpath('/p1:ProductDescription/p1:Features/wm:Warranty/wm:WarrantyPeriod/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wm,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelWarrAndMain}}' ))[1]::varchar(256)
+                                                          AS warranty_period
+  ,(xpath('/p1:ProductDescription/p1:Features/wm:Warranty/wm:Description/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wm,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelWarrAndMain}}' ))[1]::varchar(256)
+                                                          AS warranty_description
+  ,(xpath('/p1:ProductDescription/p1:Features/wm:Maintenance/wm:NoOfYears/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wm,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelWarrAndMain}}' ))[1]::varchar(256)
+                                                             AS no_of_years
+  ,(xpath('/p1:ProductDescription/p1:Features/wm:Maintenance/wm:Description/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wm,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelWarrAndMain}}' ))[1]::varchar(256)
+                                                             AS maintenance_description
+  ,(xpath('/p1:ProductDescription/p1:Features/wf:wheel/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wf,http://www.adventure-works.com/schemas/OtherFeatures}}'))[1]::varchar(256)
+                                              AS wheel
+  ,(xpath('/p1:ProductDescription/p1:Features/wf:saddle/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wf,http://www.adventure-works.com/schemas/OtherFeatures}}'))[1]::varchar(256)
+                                              AS saddle
+  ,(xpath('/p1:ProductDescription/p1:Features/wf:pedal/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wf,http://www.adventure-works.com/schemas/OtherFeatures}}'))[1]::varchar(256)
+                                              AS pedal
+  ,(xpath('/p1:ProductDescription/p1:Features/wf:BikeFrame/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wf,http://www.adventure-works.com/schemas/OtherFeatures}}'))[1]::varchar
+                                              AS bike_frame
+  ,(xpath('/p1:ProductDescription/p1:Features/wf:crankset/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription},{wf,http://www.adventure-works.com/schemas/OtherFeatures}}'))[1]::varchar(256)
+                                              AS crankset
+  ,(xpath('/p1:ProductDescription/p1:Picture/p1:Angle/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(256)
+                                             AS picture_angle
+  ,(xpath('/p1:ProductDescription/p1:Picture/p1:Size/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(256)
+                                             AS picture_size
+  ,(xpath('/p1:ProductDescription/p1:Picture/p1:ProductPhotoID/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(256)
+                                             AS product_photo_id
+  ,(xpath('/p1:ProductDescription/p1:Specifications/Material/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(256)
+                                                 AS material
+  ,(xpath('/p1:ProductDescription/p1:Specifications/Color/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(256)
+                                                 AS color
+  ,(xpath('/p1:ProductDescription/p1:Specifications/ProductLine/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(256)
+                                                 AS product_line
+  ,(xpath('/p1:ProductDescription/p1:Specifications/Style/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(256)
+                                                 AS style
+  ,(xpath('/p1:ProductDescription/p1:Specifications/RiderExperience/text()', catalog_description, '{{p1,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription}}' ))[1]::varchar(1024)
+                                                 AS rider_experience
   ,rowguid
-  ,ModifiedDate
-FROM Production.ProductModel
-WHERE CatalogDescription IS NOT NULL;
+  ,modified_date
+from production.product_model
+where catalog_description is not null;
 
 
 -- Instructions have many locations, and locations have many steps
-CREATE VIEW Production.vProductModelInstructions
-AS
-SELECT
-    pm.ProductModelID
-    ,pm.Name
-    -- Access the overall Instructions xml brought through from %line 2938 and %line 2943
-    ,(xpath('/ns:root/text()', pm.Instructions, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelManuInstructions}}'))[1]::varchar AS Instructions
-    -- Bring out information about the location, broken out in %line 2945
-    ,CAST((xpath('@LocationID', pm.MfgInstructions))[1]::varchar AS INTEGER) AS "LocationID"
-    ,CAST((xpath('@SetupHours', pm.MfgInstructions))[1]::varchar AS DECIMAL(9, 4)) AS "SetupHours"
-    ,CAST((xpath('@MachineHours', pm.MfgInstructions))[1]::varchar AS DECIMAL(9, 4)) AS "MachineHours"
-    ,CAST((xpath('@LaborHours', pm.MfgInstructions))[1]::varchar AS DECIMAL(9, 4)) AS "LaborHours"
-    ,CAST((xpath('@LotSize', pm.MfgInstructions))[1]::varchar AS INTEGER) AS "LotSize"
-    -- Show specific detail about each step broken out in %line 2940
-    ,(xpath('/step/text()', pm.Step))[1]::varchar(1024) AS "Step"
+create view production.v_product_model_instructions
+as
+select
+    pm.product_model_id
+    ,pm.name
+    -- access the overall instructions xml brought through from %line 2938 and %line 2943
+    ,(xpath('/ns:root/text()', pm.instructions, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelManuInstructions}}'))[1]::varchar as instructions
+    -- bring out information about the location, broken out in %line 2945
+    ,cast((xpath('@LocationID', pm.mfg_instructions))[1]::varchar as integer) as "location_id"
+    ,cast((xpath('@SetupHours', pm.mfg_instructions))[1]::varchar as decimal(9, 4)) as "setup_hours"
+    ,cast((xpath('@MachineHours', pm.mfg_instructions))[1]::varchar as decimal(9, 4)) as "machine_hours"
+    ,cast((xpath('@LaborHours', pm.mfg_instructions))[1]::varchar as decimal(9, 4)) as "labor_hours"
+    ,cast((xpath('@LotSize', pm.mfg_instructions))[1]::varchar as integer) as "lot_size"
+    -- show specific detail about each step broken out in %line 2940
+    ,(xpath('/step/text()', pm.step))[1]::varchar(1024) as "step"
     ,pm.rowguid
-    ,pm.ModifiedDate
-FROM (SELECT locations.ProductModelID, locations.Name, locations.rowguid, locations.ModifiedDate
-    ,locations.Instructions, locations.MfgInstructions
-    -- Further break out the location information from the inner query below into individual steps
-    ,UNNEST(xpath('step', locations.MfgInstructions)) AS Step
-  FROM (SELECT
-      -- Just pass these through so they can be referenced at the outermost query
-      ProductModelID, Name, rowguid, ModifiedDate, Instructions
-      -- And also break out Instructions into individual locations to pass up to the middle query
-      ,UNNEST(xpath('/ns:root/ns:Location', Instructions, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelManuInstructions}}')) AS MfgInstructions
-    FROM Production.ProductModel) AS locations) AS pm;
+    ,pm.modified_date
+from (select locations.product_model_id, locations.name, locations.rowguid, locations.modified_date
+    ,locations.instructions, locations.mfg_instructions
+    -- further break out the location information from the inner query below into individual steps
+    ,unnest(xpath('step', locations.mfg_instructions)) as step
+  from (select
+      -- just pass these through so they can be referenced at the outermost query
+      product_model_id, name, rowguid, modified_date, instructions
+      -- and also break out instructions into individual locations to pass up to the middle query
+      ,unnest(xpath('/ns:root/ns:Location', instructions, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelManuInstructions}}')) as mfg_instructions
+    from production.product_model) as locations) as pm;
 
 
-CREATE VIEW Sales.vSalesPerson
-AS
-SELECT
-    s.BusinessEntityID
-    ,p.Title
-    ,p.FirstName
-    ,p.MiddleName
-    ,p.LastName
-    ,p.Suffix
-    ,e.JobTitle
-    ,pp.PhoneNumber
-    ,pnt.Name AS PhoneNumberType
-    ,ea.EmailAddress
-    ,p.EmailPromotion
-    ,a.AddressLine1
-    ,a.AddressLine2
-    ,a.City
-    ,sp.Name AS StateProvinceName
-    ,a.PostalCode
-    ,cr.Name AS CountryRegionName
-    ,st.Name AS TerritoryName
-    ,st.Group AS TerritoryGroup
-    ,s.SalesQuota
-    ,s.SalesYTD
-    ,s.SalesLastYear
-FROM Sales.SalesPerson s
-  INNER JOIN HumanResources.Employee e
-    ON e.BusinessEntityID = s.BusinessEntityID
-  INNER JOIN Person.Person p
-    ON p.BusinessEntityID = s.BusinessEntityID
-  INNER JOIN Person.BusinessEntityAddress bea
-    ON bea.BusinessEntityID = s.BusinessEntityID
-  INNER JOIN Person.Address a
-    ON a.AddressID = bea.AddressID
-  INNER JOIN Person.StateProvince sp
-    ON sp.StateProvinceID = a.StateProvinceID
-  INNER JOIN Person.CountryRegion cr
-    ON cr.CountryRegionCode = sp.CountryRegionCode
-  LEFT OUTER JOIN Sales.SalesTerritory st
-    ON st.TerritoryID = s.TerritoryID
-  LEFT OUTER JOIN Person.EmailAddress ea
-    ON ea.BusinessEntityID = p.BusinessEntityID
-  LEFT OUTER JOIN Person.PersonPhone pp
-    ON pp.BusinessEntityID = p.BusinessEntityID
-  LEFT OUTER JOIN Person.PhoneNumberType pnt
-    ON pnt.PhoneNumberTypeID = pp.PhoneNumberTypeID;
+create view sales.v_sales_person
+as
+select
+    s.business_entity_id
+    ,p.title
+    ,p.first_name
+    ,p.middle_name
+    ,p.last_name
+    ,p.suffix
+    ,e.job_title
+    ,pp.phone_number
+    ,pnt.name as phone_number_type
+    ,ea.email_address
+    ,p.email_promotion
+    ,a.address_line1
+    ,a.address_line2
+    ,a.city
+    ,sp.name as state_province_name
+    ,a.postal_code
+    ,cr.name as country_region_name
+    ,st.name as territory_name
+    ,st.group as territory_group
+    ,s.sales_quota
+    ,s.sales_ytd
+    ,s.sales_last_year
+from sales.sales_person s
+  inner join human_resources.employee e
+    on e.business_entity_id = s.business_entity_id
+  inner join person.person p
+    on p.business_entity_id = s.business_entity_id
+  inner join person.business_entity_address bea
+    on bea.business_entity_id = s.business_entity_id
+  inner join person.address a
+    on a.address_id = bea.address_id
+  inner join person.state_province sp
+    on sp.state_province_id = a.state_province_id
+  inner join person.country_region cr
+    on cr.country_region_code = sp.country_region_code
+  left outer join sales.sales_territory st
+    on st.territory_id = s.territory_id
+  left outer join person.email_address ea
+    on ea.business_entity_id = p.business_entity_id
+  left outer join person.person_phone pp
+    on pp.business_entity_id = p.business_entity_id
+  left outer join person.phone_number_type pnt
+    on pnt.phone_number_type_id = pp.phone_number_type_id;
 
 
 -- This view provides the aggregated data that gets used in the PIVOTed view below
-CREATE VIEW Sales.vSalesPersonSalesByFiscalYearsData
-AS
+create view sales.v_sales_person_sales_by_fiscal_years_data
+as
 -- Of the 56 possible combinations of one of the 14 SalesPersons selling across one of
 -- 4 FiscalYears, here we end up with 48 rows of aggregated data (since some sales people
 -- were hired and started working in FY2012 or FY2013).
-SELECT granular.SalesPersonID, granular.FullName, granular.JobTitle, granular.SalesTerritory, SUM(granular.SubTotal) AS SalesTotal, granular.FiscalYear
-FROM
+select granular.sales_person_id, granular.full_name, granular.job_title, granular.sales_territory, sum(granular.sub_total) as sales_total, granular.fiscal_year
+from
 -- Brings back 3703 rows of data -- there are 3806 total sales done by a SalesPerson,
 -- of which 103 do not have any sales territory.  This is fed into the outer GROUP BY
 -- which results in 48 aggregated rows of sales data.
-  (SELECT
-      soh.SalesPersonID
-      ,p.FirstName || ' ' || COALESCE(p.MiddleName || ' ', '') || p.LastName AS FullName
-      ,e.JobTitle
-      ,st.Name AS SalesTerritory
-      ,soh.SubTotal
-      ,EXTRACT(YEAR FROM soh.OrderDate + '6 months'::interval) AS FiscalYear
-  FROM Sales.SalesPerson sp
-    INNER JOIN Sales.SalesOrderHeader soh
-      ON sp.BusinessEntityID = soh.SalesPersonID
-    INNER JOIN Sales.SalesTerritory st
-      ON sp.TerritoryID = st.TerritoryID
-    INNER JOIN HumanResources.Employee e
-      ON soh.SalesPersonID = e.BusinessEntityID
-    INNER JOIN Person.Person p
-      ON p.BusinessEntityID = sp.BusinessEntityID
-  ) AS granular
-GROUP BY granular.SalesPersonID, granular.FullName, granular.JobTitle, granular.SalesTerritory, granular.FiscalYear;
+  (select
+      soh.sales_person_id
+      ,p.first_name || ' ' || coalesce(p.middle_name || ' ', '') || p.last_name as full_name
+      ,e.job_title
+      ,st.name as sales_territory
+      ,soh.sub_total
+      ,extract(year from soh.order_date + '6 months'::interval) as fiscal_year
+  from sales.sales_person sp
+    inner join sales.sales_order_header soh
+      on sp.business_entity_id = soh.sales_person_id
+    inner join sales.sales_territory st
+      on sp.territory_id = st.territory_id
+    inner join human_resources.employee e
+      on soh.sales_person_id = e.business_entity_id
+    inner join person.person p
+      on p.business_entity_id = sp.business_entity_id
+  ) as granular
+group by granular.sales_person_id, granular.full_name, granular.job_title, granular.sales_territory, granular.fiscal_year;
 
 -- Note that this PIVOT query originally refered to years 2002-2004, which jived with
 -- earlier versions of the AdventureWorks data.  Somewhere along the way all the dates
@@ -3034,263 +3033,263 @@ GROUP BY granular.SalesPersonID, granular.FullName, granular.JobTitle, granular.
 
 -- This query properly shows no data for three of our sales people in 2012,
 -- as they were hired during FY 2013.
-CREATE VIEW Sales.vSalesPersonSalesByFiscalYears
-AS
-SELECT * FROM crosstab(
-'SELECT
-    SalesPersonID
-    ,FullName
-    ,JobTitle
-    ,SalesTerritory
-    ,FiscalYear
-    ,SalesTotal
-FROM Sales.vSalesPersonSalesByFiscalYearsData
-ORDER BY 2,4'
+create view sales.v_sales_person_sales_by_fiscal_years
+as
+select * from crosstab(
+'select
+    sales_person_id
+    ,full_name
+    ,job_title
+    ,sales_territory
+    ,fiscal_year
+    ,sales_total
+from sales.v_sales_person_sales_by_fiscal_years_data
+order by 2,4'
 -- This set of fiscal years could have dynamically come from a SELECT DISTINCT,
 -- but we wanted to omit 2011 and also ...
-,$$SELECT unnest('{2012,2013,2014}'::text[])$$)
+,$$_select unnest('{2012,2013,2014}'::text[])$$)
 -- ... still the FiscalYear values have to be hard-coded here.
-AS SalesTotal ("SalesPersonID" integer, "FullName" text, "JobTitle" text, "SalesTerritory" text,
- "2012" DECIMAL(12, 4), "2013" DECIMAL(12, 4), "2014" DECIMAL(12, 4));
+as sales_total ("sales_person_id" integer, "full_name" text, "job_title" text, "sales_territory" text,
+ "2012" decimal(12, 4), "2013" decimal(12, 4), "2014" decimal(12, 4));
 
 
-CREATE MATERIALIZED VIEW Person.vStateProvinceCountryRegion
-AS
-SELECT
-    sp.StateProvinceID
-    ,sp.StateProvinceCode
-    ,sp.IsOnlyStateProvinceFlag
-    ,sp.Name AS StateProvinceName
-    ,sp.TerritoryID
-    ,cr.CountryRegionCode
-    ,cr.Name AS CountryRegionName
-FROM Person.StateProvince sp
-    INNER JOIN Person.CountryRegion cr
-    ON sp.CountryRegionCode = cr.CountryRegionCode;
+create materialized view person.v_state_province_country_region
+as
+select
+    sp.state_province_id
+    ,sp.state_province_code
+    ,sp.is_only_state_province_flag
+    ,sp.name as state_province_name
+    ,sp.territory_id
+    ,cr.country_region_code
+    ,cr.name as country_region_name
+from person.state_province sp
+    inner join person.country_region cr
+    on sp.country_region_code = cr.country_region_code;
 
-CREATE UNIQUE INDEX IX_vStateProvinceCountryRegion ON Person.vStateProvinceCountryRegion(StateProvinceID, CountryRegionCode);
-CLUSTER Person.vStateProvinceCountryRegion USING IX_vStateProvinceCountryRegion;
+create unique index ix_v_state_province_country_region on person.v_state_province_country_region(state_province_id, country_region_code);
+cluster person.v_state_province_country_region using ix_v_state_province_country_region;
 -- If there are changes to either of these tables, this should be run to update the view:
---   REFRESH MATERIALIZED VIEW Production.vStateProvinceCountryRegion;
+--   REFRESH MATERIALIZED VIEW production.v_state_province_country_region;
 
 
-CREATE VIEW Sales.vStoreWithDemographics
-AS
-SELECT
-    BusinessEntityID
-    ,Name
-    ,CAST(UNNEST(xpath('/ns:StoreSurvey/ns:AnnualSales/text()', Demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar AS money)
-                                       AS "AnnualSales"
-    ,CAST(UNNEST(xpath('/ns:StoreSurvey/ns:AnnualRevenue/text()', Demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar AS money)
-                                       AS "AnnualRevenue"
-    ,UNNEST(xpath('/ns:StoreSurvey/ns:BankName/text()', Demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar(50)
-                                  AS "BankName"
-    ,UNNEST(xpath('/ns:StoreSurvey/ns:BusinessType/text()', Demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar(5)
-                                  AS "BusinessType"
-    ,CAST(UNNEST(xpath('/ns:StoreSurvey/ns:YearOpened/text()', Demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar AS integer)
-                                       AS "YearOpened"
-    ,UNNEST(xpath('/ns:StoreSurvey/ns:Specialty/text()', Demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar(50)
-                                  AS "Specialty"
-    ,CAST(UNNEST(xpath('/ns:StoreSurvey/ns:SquareFeet/text()', Demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar AS integer)
-                                       AS "SquareFeet"
-    ,UNNEST(xpath('/ns:StoreSurvey/ns:Brands/text()', Demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar(30)
-                                  AS "Brands"
-    ,UNNEST(xpath('/ns:StoreSurvey/ns:Internet/text()', Demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar(30)
-                                  AS "Internet"
-    ,CAST(UNNEST(xpath('/ns:StoreSurvey/ns:NumberEmployees/text()', Demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar AS integer)
-                                       AS "NumberEmployees"
-FROM Sales.Store;
+create view sales.v_store_with_demographics
+as
+select
+    business_entity_id
+    ,name
+    ,CAST(UNNEST(xpath('/ns:StoreSurvey/ns:AnnualSales/text()', demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar AS money)
+                                       AS "annual_sales"
+    ,CAST(UNNEST(xpath('/ns:StoreSurvey/ns:AnnualRevenue/text()', demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar AS money)
+                                       AS "annual_revenue"
+    ,UNNEST(xpath('/ns:StoreSurvey/ns:BankName/text()', demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar(50)
+                                  AS "bank_name"
+    ,UNNEST(xpath('/ns:StoreSurvey/ns:BusinessType/text()', demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar(5)
+                                  AS "business_type"
+    ,CAST(UNNEST(xpath('/ns:StoreSurvey/ns:YearOpened/text()', demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar AS integer)
+                                       AS "year_opened"
+    ,UNNEST(xpath('/ns:StoreSurvey/ns:Specialty/text()', demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar(50)
+                                  AS "specialty"
+    ,CAST(UNNEST(xpath('/ns:StoreSurvey/ns:SquareFeet/text()', demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar AS integer)
+                                       AS "square_feet"
+    ,UNNEST(xpath('/ns:StoreSurvey/ns:Brands/text()', demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar(30)
+                                  AS "brands"
+    ,UNNEST(xpath('/ns:StoreSurvey/ns:Internet/text()', demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar(30)
+                                  AS "internet"
+    ,CAST(UNNEST(xpath('/ns:StoreSurvey/ns:NumberEmployees/text()', demographics, '{{ns,http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/StoreSurvey}}'))::varchar AS integer)
+                                       AS "number_employees"
+from sales.store;
 
 
-CREATE VIEW Sales.vStoreWithContacts
-AS
-SELECT
-    s.BusinessEntityID
-    ,s.Name
-    ,ct.Name AS ContactType
-    ,p.Title
-    ,p.FirstName
-    ,p.MiddleName
-    ,p.LastName
-    ,p.Suffix
-    ,pp.PhoneNumber
-    ,pnt.Name AS PhoneNumberType
-    ,ea.EmailAddress
-    ,p.EmailPromotion
-FROM Sales.Store s
-  INNER JOIN Person.BusinessEntityContact bec
-    ON bec.BusinessEntityID = s.BusinessEntityID
-  INNER JOIN Person.ContactType ct
-    ON ct.ContactTypeID = bec.ContactTypeID
-  INNER JOIN Person.Person p
-    ON p.BusinessEntityID = bec.PersonID
-  LEFT OUTER JOIN Person.EmailAddress ea
-    ON ea.BusinessEntityID = p.BusinessEntityID
-  LEFT OUTER JOIN Person.PersonPhone pp
-    ON pp.BusinessEntityID = p.BusinessEntityID
-  LEFT OUTER JOIN Person.PhoneNumberType pnt
-    ON pnt.PhoneNumberTypeID = pp.PhoneNumberTypeID;
+create view sales.v_store_with_contacts
+as
+select
+    s.business_entity_id
+    ,s.name
+    ,ct.name as contact_type
+    ,p.title
+    ,p.first_name
+    ,p.middle_name
+    ,p.last_name
+    ,p.suffix
+    ,pp.phone_number
+    ,pnt.name as phone_number_type
+    ,ea.email_address
+    ,p.email_promotion
+from sales.store s
+  inner join person.business_entity_contact bec
+    on bec.business_entity_id = s.business_entity_id
+  inner join person.contact_type ct
+    on ct.contact_type_id = bec.contact_type_id
+  inner join person.person p
+    on p.business_entity_id = bec.person_id
+  left outer join person.email_address ea
+    on ea.business_entity_id = p.business_entity_id
+  left outer join person.person_phone pp
+    on pp.business_entity_id = p.business_entity_id
+  left outer join person.phone_number_type pnt
+    on pnt.phone_number_type_id = pp.phone_number_type_id;
 
 
-CREATE VIEW Sales.vStoreWithAddresses
-AS
-SELECT
-    s.BusinessEntityID
-    ,s.Name
-    ,at.Name AS AddressType
-    ,a.AddressLine1
-    ,a.AddressLine2
-    ,a.City
-    ,sp.Name AS StateProvinceName
-    ,a.PostalCode
-    ,cr.Name AS CountryRegionName
-FROM Sales.Store s
-  INNER JOIN Person.BusinessEntityAddress bea
-    ON bea.BusinessEntityID = s.BusinessEntityID
-  INNER JOIN Person.Address a
-    ON a.AddressID = bea.AddressID
-  INNER JOIN Person.StateProvince sp
-    ON sp.StateProvinceID = a.StateProvinceID
-  INNER JOIN Person.CountryRegion cr
-    ON cr.CountryRegionCode = sp.CountryRegionCode
-  INNER JOIN Person.AddressType at
-    ON at.AddressTypeID = bea.AddressTypeID;
+create view sales.v_store_with_addresses
+as
+select
+    s.business_entity_id
+    ,s.name
+    ,at.name as address_type
+    ,a.address_line1
+    ,a.address_line2
+    ,a.city
+    ,sp.name as state_province_name
+    ,a.postal_code
+    ,cr.name as country_region_name
+from sales.store s
+  inner join person.business_entity_address bea
+    on bea.business_entity_id = s.business_entity_id
+  inner join person.address a
+    on a.address_id = bea.address_id
+  inner join person.state_province sp
+    on sp.state_province_id = a.state_province_id
+  inner join person.country_region cr
+    on cr.country_region_code = sp.country_region_code
+  inner join person.address_type at
+    on at.address_type_id = bea.address_type_id;
 
 
-CREATE VIEW Purchasing.vVendorWithContacts
-AS
-SELECT
-    v.BusinessEntityID
-    ,v.Name
-    ,ct.Name AS ContactType
-    ,p.Title
-    ,p.FirstName
-    ,p.MiddleName
-    ,p.LastName
-    ,p.Suffix
-    ,pp.PhoneNumber
-    ,pnt.Name AS PhoneNumberType
-    ,ea.EmailAddress
-    ,p.EmailPromotion
-FROM Purchasing.Vendor v
-  INNER JOIN Person.BusinessEntityContact bec
-    ON bec.BusinessEntityID = v.BusinessEntityID
-  INNER JOIN Person.ContactType ct
-    ON ct.ContactTypeID = bec.ContactTypeID
-  INNER JOIN Person.Person p
-    ON p.BusinessEntityID = bec.PersonID
-  LEFT OUTER JOIN Person.EmailAddress ea
-    ON ea.BusinessEntityID = p.BusinessEntityID
-  LEFT OUTER JOIN Person.PersonPhone pp
-    ON pp.BusinessEntityID = p.BusinessEntityID
-  LEFT OUTER JOIN Person.PhoneNumberType pnt
-    ON pnt.PhoneNumberTypeID = pp.PhoneNumberTypeID;
+create view purchasing.v_vendor_with_contacts
+as
+select
+    v.business_entity_id
+    ,v.name
+    ,ct.name as contact_type
+    ,p.title
+    ,p.first_name
+    ,p.middle_name
+    ,p.last_name
+    ,p.suffix
+    ,pp.phone_number
+    ,pnt.name as phone_number_type
+    ,ea.email_address
+    ,p.email_promotion
+from purchasing.vendor v
+  inner join person.business_entity_contact bec
+    on bec.business_entity_id = v.business_entity_id
+  inner join person.contact_type ct
+    on ct.contact_type_id = bec.contact_type_id
+  inner join person.person p
+    on p.business_entity_id = bec.person_id
+  left outer join person.email_address ea
+    on ea.business_entity_id = p.business_entity_id
+  left outer join person.person_phone pp
+    on pp.business_entity_id = p.business_entity_id
+  left outer join person.phone_number_type pnt
+    on pnt.phone_number_type_id = pp.phone_number_type_id;
 
 
-CREATE VIEW Purchasing.vVendorWithAddresses
-AS
-SELECT
-    v.BusinessEntityID
-    ,v.Name
-    ,at.Name AS AddressType
-    ,a.AddressLine1
-    ,a.AddressLine2
-    ,a.City
-    ,sp.Name AS StateProvinceName
-    ,a.PostalCode
-    ,cr.Name AS CountryRegionName
-FROM Purchasing.Vendor v
-  INNER JOIN Person.BusinessEntityAddress bea
-    ON bea.BusinessEntityID = v.BusinessEntityID
-  INNER JOIN Person.Address a
-    ON a.AddressID = bea.AddressID
-  INNER JOIN Person.StateProvince sp
-    ON sp.StateProvinceID = a.StateProvinceID
-  INNER JOIN Person.CountryRegion cr
-    ON cr.CountryRegionCode = sp.CountryRegionCode
-  INNER JOIN Person.AddressType at
-    ON at.AddressTypeID = bea.AddressTypeID;
+create view purchasing.v_vendor_with_addresses
+as
+select
+    v.business_entity_id
+    ,v.name
+    ,at.name as address_type
+    ,a.address_line1
+    ,a.address_line2
+    ,a.city
+    ,sp.name as state_province_name
+    ,a.postal_code
+    ,cr.name as country_region_name
+from purchasing.vendor v
+  inner join person.business_entity_address bea
+    on bea.business_entity_id = v.business_entity_id
+  inner join person.address a
+    on a.address_id = bea.address_id
+  inner join person.state_province sp
+    on sp.state_province_id = a.state_province_id
+  inner join person.country_region cr
+    on cr.country_region_code = sp.country_region_code
+  inner join person.address_type at
+    on at.address_type_id = bea.address_type_id;
 
 
 -- Convenience views
 
-CREATE SCHEMA pe
-  CREATE VIEW a AS SELECT addressid AS id, * FROM person.address
-  CREATE VIEW at AS SELECT addresstypeid AS id, * FROM person.addresstype
-  CREATE VIEW be AS SELECT businessentityid AS id, * FROM person.businessentity
-  CREATE VIEW bea AS SELECT businessentityid AS id, * FROM person.businessentityaddress
-  CREATE VIEW bec AS SELECT businessentityid AS id, * FROM person.businessentitycontact
-  CREATE VIEW ct AS SELECT contacttypeid AS id, * FROM person.contacttype
-  CREATE VIEW cr AS SELECT * FROM person.countryregion
-  CREATE VIEW e AS SELECT emailaddressid AS id, * FROM person.emailaddress
-  CREATE VIEW pa AS SELECT businessentityid AS id, * FROM person.password
-  CREATE VIEW p AS SELECT businessentityid AS id, * FROM person.person
-  CREATE VIEW pp AS SELECT businessentityid AS id, * FROM person.personphone
-  CREATE VIEW pnt AS SELECT phonenumbertypeid AS id, * FROM person.phonenumbertype
-  CREATE VIEW sp AS SELECT stateprovinceid AS id, * FROM person.stateprovince
+create schema pe
+  create view a as select address_id as id, * from person.address
+  create view at as select address_type_id as id, * from person.address_type
+  create view be as select business_entity_id as id, * from person.business_entity
+  create view bea as select business_entity_id as id, * from person.business_entity_address
+  create view bec as select business_entity_id as id, * from person.business_entity_contact
+  create view ct as select contact_type_id as id, * from person.contact_type
+  create view cr as select * from person.country_region
+  create view e as select email_address_id as id, * from person.email_address
+  create view pa as select business_entity_id as id, * from person.password
+  create view p as select business_entity_id as id, * from person.person
+  create view pp as select business_entity_id as id, * from person.person_phone
+  create view pnt as select phone_number_type_id as id, * from person.phone_number_type
+  create view sp as select state_province_id as id, * from person.state_province
 ;
-CREATE SCHEMA hr
-  CREATE VIEW d AS SELECT departmentid AS id, * FROM humanresources.department
-  CREATE VIEW e AS SELECT businessentityid AS id, * FROM humanresources.employee
-  CREATE VIEW edh AS SELECT businessentityid AS id, * FROM humanresources.employeedepartmenthistory
-  CREATE VIEW eph AS SELECT businessentityid AS id, * FROM humanresources.employeepayhistory
-  CREATE VIEW jc AS SELECT jobcandidateid AS id, * FROM humanresources.jobcandidate
-  CREATE VIEW s AS SELECT shiftid AS id, * FROM humanresources.shift
+create schema hr
+  create view d as select department_id as id, * from human_resources.department
+  create view e as select business_entity_id as id, * from human_resources.employee
+  create view edh as select business_entity_id as id, * from human_resources.employee_department_history
+  create view eph as select business_entity_id as id, * from human_resources.employee_pay_history
+  create view jc as select job_candidate_id as id, * from human_resources.job_candidate
+  create view s as select shift_id as id, * from human_resources.shift
 ;
-CREATE SCHEMA pr
-  CREATE VIEW bom AS SELECT billofmaterialsid AS id, * FROM production.billofmaterials
-  CREATE VIEW c AS SELECT cultureid AS id, * FROM production.culture
-  CREATE VIEW d AS SELECT * FROM production.document
-  CREATE VIEW i AS SELECT illustrationid AS id, * FROM production.illustration
-  CREATE VIEW l AS SELECT locationid AS id, * FROM production.location
-  CREATE VIEW p AS SELECT productid AS id, * FROM production.product
-  CREATE VIEW pc AS SELECT productcategoryid AS id, * FROM production.productcategory
-  CREATE VIEW pch AS SELECT productid AS id, * FROM production.productcosthistory
-  CREATE VIEW pd AS SELECT productdescriptionid AS id, * FROM production.productdescription
-  CREATE VIEW pdoc AS SELECT productid AS id, * FROM production.productdocument
-  CREATE VIEW pi AS SELECT productid AS id, * FROM production.productinventory
-  CREATE VIEW plph AS SELECT productid AS id, * FROM production.productlistpricehistory
-  CREATE VIEW pm AS SELECT productmodelid AS id, * FROM production.productmodel
-  CREATE VIEW pmi AS SELECT * FROM production.productmodelillustration
-  CREATE VIEW pmpdc AS SELECT * FROM production.productmodelproductdescriptionculture
-  CREATE VIEW pp AS SELECT productphotoid AS id, * FROM production.productphoto
-  CREATE VIEW ppp AS SELECT * FROM production.productproductphoto
-  CREATE VIEW pr AS SELECT productreviewid AS id, * FROM production.productreview
-  CREATE VIEW psc AS SELECT productsubcategoryid AS id, * FROM production.productsubcategory
-  CREATE VIEW sr AS SELECT scrapreasonid AS id, * FROM production.scrapreason
-  CREATE VIEW th AS SELECT transactionid AS id, * FROM production.transactionhistory
-  CREATE VIEW tha AS SELECT transactionid AS id, * FROM production.transactionhistoryarchive
-  CREATE VIEW um AS SELECT unitmeasurecode AS id, * FROM production.unitmeasure
-  CREATE VIEW w AS SELECT workorderid AS id, * FROM production.workorder
-  CREATE VIEW wr AS SELECT workorderid AS id, * FROM production.workorderrouting
+create schema pr
+  create view bom as select bill_of_materials_id as id, * from production.bill_of_materials
+  create view c as select culture_id as id, * from production.culture
+  create view d as select * from production.document
+  create view i as select illustration_id as id, * from production.illustration
+  create view l as select location_id as id, * from production.location
+  create view p as select product_id as id, * from production.product
+  create view pc as select product_category_id as id, * from production.product_category
+  create view pch as select product_id as id, * from production.product_cost_history
+  create view pd as select product_description_id as id, * from production.product_description
+  create view pdoc as select product_id as id, * from production.product_document
+  create view pi as select product_id as id, * from production.product_inventory
+  create view plph as select product_id as id, * from production.product_list_price_history
+  create view pm as select product_model_id as id, * from production.product_model
+  create view pmi as select * from production.product_model_illustration
+  create view pmpdc as select * from production.product_model_product_description_culture
+  create view pp as select product_photo_id as id, * from production.product_photo
+  create view ppp as select * from production.product_product_photo
+  create view pr as select product_review_id as id, * from production.product_review
+  create view psc as select product_subcategory_id as id, * from production.product_subcategory
+  create view sr as select scrap_reason_id as id, * from production.scrap_reason
+  create view th as select transaction_id as id, * from production.transaction_history
+  create view tha as select transaction_id as id, * from production.transaction_history_archive
+  create view um as select unit_measure_code as id, * from production.unit_measure
+  create view w as select work_order_id as id, * from production.work_order
+  create view wr as select work_order_id as id, * from production.work_order_routing
 ;
-CREATE SCHEMA pu
-  CREATE VIEW pv AS SELECT productid AS id, * FROM purchasing.productvendor
-  CREATE VIEW pod AS SELECT purchaseorderdetailid AS id, * FROM purchasing.purchaseorderdetail
-  CREATE VIEW poh AS SELECT purchaseorderid AS id, * FROM purchasing.purchaseorderheader
-  CREATE VIEW sm AS SELECT shipmethodid AS id, * FROM purchasing.shipmethod
-  CREATE VIEW v AS SELECT businessentityid AS id, * FROM purchasing.vendor
+create schema pu
+  create view pv as select product_id as id, * from purchasing.product_vendor
+  create view pod as select purchase_order_detail_id as id, * from purchasing.purchase_order_detail
+  create view poh as select purchase_order_id as id, * from purchasing.purchase_order_header
+  create view sm as select ship_method_id as id, * from purchasing.ship_method
+  create view v as select business_entity_id as id, * from purchasing.vendor
 ;
-CREATE SCHEMA sa
-  CREATE VIEW crc AS SELECT * FROM sales.countryregioncurrency
-  CREATE VIEW cc AS SELECT creditcardid AS id, * FROM sales.creditcard
-  CREATE VIEW cu AS SELECT currencycode AS id, * FROM sales.currency
-  CREATE VIEW cr AS SELECT * FROM sales.currencyrate
-  CREATE VIEW c AS SELECT customerid AS id, * FROM sales.customer
-  CREATE VIEW pcc AS SELECT businessentityid AS id, * FROM sales.personcreditcard
-  CREATE VIEW sod AS SELECT salesorderdetailid AS id, * FROM sales.salesorderdetail
-  CREATE VIEW soh AS SELECT salesorderid AS id, * FROM sales.salesorderheader
-  CREATE VIEW sohsr AS SELECT * FROM sales.salesorderheadersalesreason
-  CREATE VIEW sp AS SELECT businessentityid AS id, * FROM sales.salesperson
-  CREATE VIEW spqh AS SELECT businessentityid AS id, * FROM sales.salespersonquotahistory
-  CREATE VIEW sr AS SELECT salesreasonid AS id, * FROM sales.salesreason
-  CREATE VIEW tr AS SELECT salestaxrateid AS id, * FROM sales.salestaxrate
-  CREATE VIEW st AS SELECT territoryid AS id, * FROM sales.salesterritory
-  CREATE VIEW sth AS SELECT territoryid AS id, * FROM sales.salesterritoryhistory
-  CREATE VIEW sci AS SELECT shoppingcartitemid AS id, * FROM sales.shoppingcartitem
-  CREATE VIEW so AS SELECT specialofferid AS id, * FROM sales.specialoffer
-  CREATE VIEW sop AS SELECT specialofferid AS id, * FROM sales.specialofferproduct
-  CREATE VIEW s AS SELECT businessentityid AS id, * FROM sales.store
+create schema sa
+  create view crc as select * from sales.country_region_currency
+  create view cc as select credit_card_id as id, * from sales.credit_card
+  create view cu as select currency_code as id, * from sales.currency
+  create view cr as select * from sales.currency_rate
+  create view c as select customer_id as id, * from sales.customer
+  create view pcc as select business_entity_id as id, * from sales.person_credit_card
+  create view sod as select sales_order_detail_id as id, * from sales.sales_order_detail
+  create view soh as select sales_order_id as id, * from sales.sales_order_header
+  create view sohsr as select * from sales.sales_order_header_sales_reason
+  create view sp as select business_entity_id as id, * from sales.sales_person
+  create view spqh as select business_entity_id as id, * from sales.sales_person_quota_history
+  create view sr as select sales_reason_id as id, * from sales.sales_reason
+  create view tr as select sales_tax_rate_id as id, * from sales.sales_tax_rate
+  create view st as select territory_id as id, * from sales.sales_territory
+  create view sth as select territory_id as id, * from sales.sales_territory_history
+  create view sci as select shopping_cart_item_id as id, * from sales.shopping_cart_item
+  create view so as select special_offer_id as id, * from sales.special_offer
+  create view sop as select special_offer_id as id, * from sales.special_offer_product
+  create view s as select business_entity_id as id, * from sales.store
 ;
 
 \pset tuples_only off
@@ -3298,8 +3297,8 @@ CREATE SCHEMA sa
 
 
 -- 805 rows in BusinessEntity but not in Person
--- SELECT be.businessentityid FROM person.businessentity AS be LEFT OUTER JOIN person.person AS p ON be.businessentityid = p.businessentityid WHERE p.businessentityid IS NULL;
+-- SELECT be.business_entity_id FROM person.businessentity AS be LEFT OUTER JOIN person.person AS p ON be.business_entity_id = p.business_entity_id WHERE p.business_entity_id IS NULL;
 
 -- All the tables in Adventureworks:
 -- (Did you know that \dt can filter schema and table names using RegEx?)
-\dt (humanresources|person|production|purchasing|sales).*
+\dt (human_resources|person|production|purchasing|sales).*
